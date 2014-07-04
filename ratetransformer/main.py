@@ -1,26 +1,27 @@
 #!/usr/bin/env python
 #----------------------------------------------------
 
+from __future__ import print_function
 import math
 import rate
 
 def main():
     """
-    This code is run if this module is called independantly and is intended as a demo
+    This code is run if this module is called independently and is intended as a demo
     Normally this module should be used by calling the perform_rating() function with transformer details passed to function
     """
     
     FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, CRF = example_calculation()
 
-    print 'Results of example transformer calculation....'
-    print '-' * 20
-    print '# of Iterations: ' + str(NumIter)
-    print 'Reason for rating: ' + FinalReason
-    print 'Peak Load: ' + str(Max_Load)
-    print 'Top Oil Temp: ' + str(Max_TOtemp)
-    print 'WHS Temp: ' + str(Max_WHStemp)
-    print 'CRF: ' + str(CRF)
-    print 'Ageing: ' + str(LoL)
+    print('Results of example transformer calculation....')
+    print('-' * 20)
+    print('# of Iterations: ' + str(NumIter))
+    print('Reason for rating: ' + FinalReason)
+    print('Peak Load: ' + str(Max_Load))
+    print('Top Oil Temp: ' + str(Max_TOtemp))
+    print('WHS Temp: ' + str(Max_WHStemp))
+    print('CRF: ' + str(CRF))
+    print('Ageing: ' + str(LoL))
 
     
 def example_calculation():
@@ -73,4 +74,3 @@ def example_calculation():
 
 if __name__ == '__main__':
     main()
-
