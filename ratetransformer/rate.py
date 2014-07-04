@@ -229,10 +229,10 @@ def calc_winding_rise(t, StartTemp, Load, HeatRunData, ThermalChar, LoadIncreasi
 
     # Set up variables
     RatedLoad = HeatRunData['RatedLoad']
-    K = Load / RatedLoad
-    gr = HeatRunData['gr']
-    H = HeatRunData['H']
-    y = ThermalChar['y']
+    K = float(Load / RatedLoad)
+    gr = float(HeatRunData['gr'])
+    H = float(HeatRunData['H'])
+    y = float(ThermalChar['y'])
 
     TauW = ThermalChar['TauW']
     k11 = ThermalChar['k11']
