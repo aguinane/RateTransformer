@@ -3,9 +3,6 @@
 
 import math
 
-def main():
-    pass
-
 def perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal):
     """
     Perform rating on a single transformer for specified rating limits
@@ -405,7 +402,3 @@ def relative_ageing_rate(WHST):
         V = 10000000.0            #High WHST numbers cause errors
         
     return V
-
-if __name__ == '__main__':
-    main()
-
