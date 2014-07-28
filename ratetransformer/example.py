@@ -7,11 +7,14 @@ import rate
 
 def main():
     """
-    This code is run if this module is called independently and is intended as a demo
-    Normally this module should be used by calling the perform_rating() function with transformer details passed to function
+    This code is run if this module is called independently 
+    and is intended as a demo
+    Normally this module should be used by calling the perform_rating() 
+    function with transformer details passed to function
     """
     
-    FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, CRF = example_calculation()
+    (FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, 
+        CRF) = example_calculation()
 
     print('Results of example transformer calculation....')
     print('-' * 20)

@@ -1,27 +1,28 @@
 #!/usr/bin/env python
-#----------------------------------------------------
-
 import math
 
-def perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal):
-    """
-    Perform rating on a single transformer for specified rating limits
-    """
 
+def perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal):
+    """ Perform rating on a single transformer for specified rating limits
+    """
     # Do some error checking first
     try:
-        if TxHeatRun['RatedLoad'] == 0 or TxHeatRun['dTOr'] == 0 or TxHeatRun['gr'] == 0 or TxHeatRun['R'] == 0:
+        if (TxHeatRun['RatedLoad'] == 0 
+                or TxHeatRun['dTOr'] == 0 
+                or TxHeatRun['gr'] == 0 
+                or TxHeatRun['R'] == 0):
             # Heat run record doesn't exist or isn't populated
             RecordExists = False
         else:
             # Heat run record exists - calculate optimal loading
             RecordExists = True
     except KeyError:
-        #Values aren't populated
+        # Values aren't populated
         RecordExists = False
 
     if RecordExists == True:
-        FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter = calculate_transformer_rating(
+        (FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, 
+            NumIter) = calculate_transformer_rating(
             TxDetails, TxLimits, TxHeatRun, TxSeasonal)
         CRF = float(Max_Load) / float(TxHeatRun['RatedLoad'])
         CRF = round(CRF, 4)
@@ -34,71 +35,63 @@ def perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal):
 
 
 def calculate_transformer_rating(ThermalChar, Limits, HeatRunData, TxSeasonal):
+    """ Calulates the optimum load conditions for specified limits
     """
-    Calulates the optimum load conditions for specified limits
-    """
-
-    #Extract Input Information
-    AmbWHS = TxSeasonal['AmbWHS']
-    AmbAgeing = TxSeasonal['AmbAgeing']
-    t = TxSeasonal['t']
-    LoadShape = TxSeasonal['LoadShape']
     
-    #Define some intial values
+    # Define some intial values
     NumIter = 0
     Limit = False
     PrevPeak = 0.0001
-    InputList = t, HeatRunData, ThermalChar, Limits, AmbWHS, AmbAgeing, LoadShape
+    InputList = (TxSeasonal['t'], HeatRunData, ThermalChar, Limits, 
+                TxSeasonal['AmbWHS'], TxSeasonal['AmbAgeing'], 
+                TxSeasonal['LoadShape'])
 
-    #Calculate the starting scaling
+    # Calculate the starting scaling
     RatedLoad = HeatRunData['RatedLoad']
-    MaxLoad = max(LoadShape)
-    IncrementFactor = (float(RatedLoad) / float(MaxLoad)) #Start by incrementing by double max load
-    ScaleFactor = IncrementFactor * 0.5 #Start with initial load at half the current load profile
+    MaxLoad = max(TxSeasonal['LoadShape'])
+    #Start by incrementing by double max load
+    IncrementFactor = (float(RatedLoad) / float(MaxLoad)) 
+    ScaleFactor = IncrementFactor * 0.5 #Start with half initial load
 
     if IncrementFactor < 0.5:
-        IncrementFactor = 0.5 #Start at half way
+        IncrementFactor = 0.5 # Start at half way
 
     if ScaleFactor < 0.2:
-        ScaleFactor = 0.2 #Start reasonably high
+        ScaleFactor = 0.2 # Start reasonably high
     
+    FinalReason = 'Did not converge' # Stops errors later
     
-    FinalReason = 'Did not converge' # Stops errors later if it didn't converge
-    
-    #Loop until scaling factor is sufficiently small (to yield more accurate results)
-    for i in range(150): #Stop after certain num of iterations if not converged
-               
-        #Loop until limit is reached
+    # Loop until scaling factor is sufficiently small
+    maxIterations = 150
+    for i in range(maxIterations):
         while Limit == False:
-            Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, L = CalculateLimit(ScaleFactor, InputList)
+            (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, 
+                L) = CalculateLimit(ScaleFactor, InputList)
             NumIter += 1
             ScaleFactor += IncrementFactor
-            FinalReason = Reason #Otherwise it will be lost when we move back an iteration
+            FinalReason = Reason # So its not lost
             
-            #Export results of iterations - for debugging
-            #print str(Limit) + ' - ' + str(Max_Load) + ' - ' + Reason
-        
-        #Step back to where limit wasn't reached to get optimal rating
+        # Step back to where limit wasn't reached to get optimal rating
         ScaleFactor = ScaleFactor - (2 * IncrementFactor)
-        #Check scale factor isn't negative
+        # Check scale factor isn't negative
         if ScaleFactor < 0:
             ScaleFactor = 0
-        Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, L = CalculateLimit(ScaleFactor, InputList)    
+        (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, 
+            L) = CalculateLimit(ScaleFactor, InputList)    
 
-        #Decrese the amount scaled for next iteration run
+        # Decrese the amount scaled for next iteration run
         IncrementFactor = (IncrementFactor / 2)
 
-        #Round values to appropriate significant figures
+        # Round values to appropriate significant figures
         Max_Load = round(Max_Load, 3)
         Max_TOtemp = round(Max_TOtemp, 2)
         Max_WHStemp = round(Max_WHStemp, 2)
         LoL = round(L, 3)
 
-        #Check if converged early
-        if IncrementFactor < 0.00001: #Check scaling factor is sufficiently small
-            if PrevPeak == Max_Load:  #Check results of iteration hasn't changed
-                #print 'Coverged after ' + str(i)
-                break # Exit loop
+        # Check if converged early
+        if IncrementFactor < 0.00001: # Check scaling factor is small
+            if PrevPeak == Max_Load:
+                break
         PrevPeak = Max_Load
     
 
@@ -106,25 +99,23 @@ def calculate_transformer_rating(ThermalChar, Limits, HeatRunData, TxSeasonal):
 
 
 def CalculateLimit(ScaleFactor, InputList):
+    """ Scales load and checks whether limit will be breached
     """
-    Scales load and checks whether limit will be breached
-    """
-    t, HeatRunData, ThermalChar, Limits, AmbWHS, AmbAgeing, LoadShape = InputList
+    (t, HeatRunData, ThermalChar, Limits, AmbWHS, AmbAgeing, 
+        LoadShape) = InputList
     TempLoadShape = [i * ScaleFactor for i in LoadShape]
 
-    #Initial Temperatures as Zero
-    TOinitial = 0             
-    WHSinitial = 0
+    # Initial Temperatures as Zero
+    TOinitial = 0; WHSinitial = 0
 
-    #Iterate until starting and ending top oil temp are the same
+    # Iterate until starting and ending top oil temp are the same
     for i in range(25): #Stop after 25 iterations if not converged
 
-        #Set up containers for final results
+        # Set up containers for final results
         List_TOtemp = []; List_WHStemp = []; List_V = []
 
-        #Set starting temperatures to final in previous run
-        TOprev = TOinitial
-        WHSprev = WHSinitial
+        # Set starting temperatures to final in previous run
+        TOprev = TOinitial; WHSprev = WHSinitial
             
         # Loop through loads values
         for index, Load in enumerate(TempLoadShape):
@@ -135,10 +126,12 @@ def CalculateLimit(ScaleFactor, InputList):
             else:
                 LoadIncreasing = False
         
-            TOrise = calc_top_oil_rise(t, TOprev, Load, HeatRunData, ThermalChar)
+            TOrise = calc_top_oil_rise(t, TOprev, Load, 
+                HeatRunData, ThermalChar)
             TOtemp = AmbWHS + TOrise
      
-            WHSrise = calc_winding_rise(t, WHSprev, Load, HeatRunData, ThermalChar,LoadIncreasing)
+            WHSrise = calc_winding_rise(t, WHSprev, Load, HeatRunData, 
+                ThermalChar,LoadIncreasing)
             WHStemp = AmbWHS + TOrise + WHSrise
             WHSageing = AmbAgeing + TOrise + WHSrise
             V = relative_ageing_rate(WHSageing)
@@ -170,13 +163,14 @@ def CalculateLimit(ScaleFactor, InputList):
         L += (V * t)  # Sum loss of life in minutes for each interval
     L = L / 60        # Calculate loss of life in hours
    
-    Limit, Reason = was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp, Max_WHStemp, L)
+    Limit, Reason = was_limit_reached(Limits, RatedLoad, Max_Load, 
+        Max_TOtemp, Max_WHStemp, L)
 
     return Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, L
 
-def was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp, Max_WHStemp, LoL):
-    """
-    Check if any limits were reached
+def was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp, 
+                      Max_WHStemp, LoL):
+    """ Check if any limits were reached
     """
     
     Limit = False
@@ -213,122 +207,98 @@ def was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp, Max_WHStemp, LoL)
 
     return Limit, Reason
 
-def calc_winding_rise(t, StartTemp, Load, HeatRunData, ThermalChar, LoadIncreasing):
-    """
-    Calculate the winding rise
+def calc_winding_rise(t, StartTemp, Load, HeatRunData, 
+                      ThermalChar, LoadIncreasing):
+    """ Calculate the winding rise
     Input values:
     t = Time Interval (min)
     StartTemp = Initial Top Oil Rise
     Load = Load to be considered (in MVA)
-    HeatRunData is a dictionary containing test results
-    ThermalChar is a dictionary containing thermal characteristics for cooling type
-    """
-
-    # Set up variables
-    RatedLoad = HeatRunData['RatedLoad']
-    K = float(Load / RatedLoad)
-    gr = float(HeatRunData['gr'])
-    H = float(HeatRunData['H'])
-    y = float(ThermalChar['y'])
-
-    TauW = ThermalChar['TauW']
-    k11 = ThermalChar['k11']
-    k21 = ThermalChar['k21']
-    k22 = ThermalChar['k22']
+    HeatRunData is a dict with test results
+    ThermalChar is a dict with thermal characteristics for cooling type
+    """ 
 
     # Determine the oil thermal time constant - rated load
-    C = ThermalChar['C']
-    P = HeatRunData['P']
-    dTOr = HeatRunData['dTOr']
-    if C == 0:
+    if ThermalChar['C'] == 0:
         # Use Lookup Table - AS 60077.7-2013 Table 5
         CoolingType = ThermalChar['CoolingType']
-        Cooling_List = ['ODAF','ODAN','OFAN','OF','OFB']
+        Cooling_List = ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']
         if any(CoolingType in s for s in Cooling_List):
             TauR = 90.0
         else:
-            Cooling_List = ['ONAF','OB']
+            Cooling_List = ['ONAF', 'OB']
             if any(CoolingType in s for s in Cooling_List):
                 TauR = 150.0
             else:
                TauR = 210.0 
     else:
         # Calculate Value
-        TauR = thermal_time_constant_at_rated_load(C,P,dTOr)
+        TauR = thermal_time_constant_at_rated_load(ThermalChar['C'], 
+            HeatRunData['P'], HeatRunData['dTOr'])
         
     # Calculate ultimate winding rise to simplify below formulas
-    dWHS = H * gr * (K ** y)
+    K = float(Load / HeatRunData['RatedLoad'])
+    dWHS = HeatRunData['H'] * HeatRunData['gr'] * (K ** ThermalChar['y'])
 
     if LoadIncreasing == True:
-        #As per AS60076.7 Eq. (5)
-        f2 = k21 * (1- math.exp((-t)/(k22*TauW))) - (k21 -1) * (1- math.exp((-t)/(TauR/k22)))
+        # As per AS60076.7 Eq. (5)
+        f2 = (ThermalChar['k21'] * 
+            (1- math.exp((-t)/(ThermalChar['k22']*ThermalChar['TauW']))) - 
+            (ThermalChar['k21'] -1) * 
+            (1- math.exp((-t)/(TauR/ThermalChar['k22'])))
+            )
         dWHSt = StartTemp + (dWHS - StartTemp) * f2
     else:
-        #As per AS60076.7 Eq. (6)
-        dWHSt = dWHS + (StartTemp-dWHS) * math.exp((-t)/(TauW))
+        # As per AS60076.7 Eq. (6)
+        dWHSt = dWHS + (StartTemp-dWHS) * math.exp((-t)/(ThermalChar['TauW']))
 
-    #print 'dWHS: ' + str(dWHS) + ' vs instdWHS: ' + str(dWHSt)
     return dWHSt
     
 def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
-    """
-    Calculate top oil rise
+    """ Calculate top oil rise
     Input values:
     t = Time Interval (min)
     StartTemp = Initial Top Oil Rise
     Load = Load to be considered (in MVA)
-    HeatRunData is a dictionary containing test results
-    ThermalChar is a dictionary containting thermal characteristics for cooling type
+    HeatRunData is a dict with test results
+    ThermalChar is a dict with thermal characteristics for cooling type
     """
-
-    #Set up variables
     dTOi = StartTemp
-    
-    dTOr = HeatRunData['dTOr']
-    RatedLoad = HeatRunData['RatedLoad']
-    P = HeatRunData['P']
-    R = HeatRunData['R']
-    
-    x = ThermalChar['x']
-    C = ThermalChar['C']
-    n = ThermalChar['n']           
-    k11 = ThermalChar['k11']
-
-    K = Load / RatedLoad
-    
-    #Determine ultimate (steady state) temperature for given load
-    dTOult = ult_top_oil_rise_at_load(K, R, dTOr, x)
-
-    #Determine the oil thermal time constant - rated load
-    if C == 0:
-        #Use Lookup Table - AS 60077.7-2013 Table 5
+    K = Load / HeatRunData['RatedLoad']
+    # Determine ultimate (steady state) temperature for given load
+    dTOult = ult_top_oil_rise_at_load(K, HeatRunData['R'], 
+        HeatRunData['dTOr'], ThermalChar['x'])
+    # Determine the oil thermal time constant - rated load
+    if ThermalChar['C'] == 0:
+        # Use Lookup Table - AS 60077.7-2013 Table 5
         CoolingType = ThermalChar['CoolingType']
-        Cooling_List = ['ODAF','ODAN','OFAN','OF','OFB']
+        Cooling_List = ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']
         if any(CoolingType in s for s in Cooling_List):
             TauR = 90.0
         else:
-            Cooling_List = ['ONAF','OB']
+            Cooling_List = ['ONAF', 'OB']
             if any(CoolingType in s for s in Cooling_List):
                 TauR = 150.0
             else:
                TauR = 210.0 
     else:
-        #Calculate Value
-        TauR = thermal_time_constant_at_rated_load(C,P,dTOr)
-
-    #Determine the oil thermal time constant - specified load
-    Tau = thermal_time_constant_as_considered_load(TauR,dTOr,dTOi,dTOult, n)
-   
-    #Determine instantaneous top oil temperature for given load
-    dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, K, R, dTOr, x, k11, Tau)
-      
+        # Calculate Value
+        TauR = thermal_time_constant_at_rated_load(ThermalChar['C'], 
+            HeatRunData['P'], HeatRunData['dTOr'])
+    # Determine the oil thermal time constant - specified load
+    Tau = thermal_time_constant_as_considered_load(TauR,HeatRunData['dTOr'],
+        dTOi, dTOult, ThermalChar['n'] )
+    # Determine instantaneous top oil temperature for given load
+    dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, K, HeatRunData['R'], 
+            HeatRunData['dTOr'], ThermalChar['x'], ThermalChar['k11'], Tau)
     return dTO
 
+
 def ult_top_oil_rise_at_load(K, R, dTOr, x):
-    """
-    Calculate the steady-state top oil rise for a given load
+    """ Calculate the steady-state top oil rise for a given load
     K = Ratio of ultimate load to rated load
-    R = Ratio of load lossed at rated load to no-load loss on top tap being studied
+    R = Ratio of load lossed at rated load to no-load loss
+    on top tap being studied
     x = oil exponent based on cooling method
     TOrated = Top-oil temperature at rated load (as determined by heat run)
     """
@@ -337,68 +307,57 @@ def ult_top_oil_rise_at_load(K, R, dTOr, x):
     return dTO
 
 
-
 def inst_top_oil_rise_at_load(dTOi, dTOult, t, K, R, dTOr, x, k11, Tau):
+    """ Calculate the instanous top oil rise at a given time period
     """
-    Calculate the instanous top oil rise at a given time period
-    """
-    #As per AS60076.7 Eq. (2)
+    # As per AS60076.7 Eq. (2)
     dTO = dTOult + (dTOi - dTOult) * math.exp((-t)/(k11*Tau))
 
     return dTO
 
-def thermal_time_constant_at_rated_load(C,P,dTOr):
-    """
-    Returns the average oil time constant in minutes (for rated load)
+
+def thermal_time_constant_at_rated_load(C, P, dTOr):
+    """ Returns the average oil time constant in minutes (for rated load)
+    As per IEEE C57.91-2011
     C = Thermal capacity of oil
     P = Supplied losses (in W) at the load considered
-    OilRise = The average oil temperature rise above ambient temperature in K at the load considered
+    OilRise = The average oil temperature rise above ambient temperature
+    in K at the load considered
     """
-                                  
-    #As per IEEE C57.91-2011
     tau = (C * dTOr * 60) / P
 
     return tau
 
-def thermal_time_constant_as_considered_load(TauR,dTOr,dTOi,dTOu, n):
-    """
-    Returns the average oil time constant in minutes (for a given load)
+
+def thermal_time_constant_as_considered_load(TauR, dTOr, dTOi, dTOu, n):
+    """ Returns the average oil time constant in minutes (for a given load)
+    As per IEEE C57.91-2011
     TauR = Thermal time constant at rated load
     dTOr = Top oil rise at rated load
     dTOi = Top oil rise initial
     dTOu = Top oil rise ultimate (at load considered)
     n = Temperature cooling exponent (From IEEE C57.91-2011 Table 4)
     """
-                                  
-    #As per IEEE C57.91-2011
     a = dTOu / dTOr
     b = dTOi / dTOr
-    
-    if (a-b) == 0:
-        #Calculation is for rated load
-        #Will cause divide by zero error
-        STTTC = TauR
-    elif n == 0:
+    if (a-b) == 0 or n == 0:
+        # Will avoid divide by zero error
         STTTC = TauR
     else:
         try:
             STTTC = TauR * (a-b)/((a**(1/n))-(b**(1/n)))
         except ZeroDivisionError:
-            STTTC = TauR #The a-b didn't catch the error
-   
+            STTTC = TauR    # The a-b didn't catch the error
     return STTTC
-                            
+
 
 def relative_ageing_rate(WHST):
+    """ Calculate the relative ageing rate of the transformer for a given
+    Winding Hotspot Temperature As per AS60076.7 Eq. (2)
+    Applies to non-thermally upgraded paper only
     """
-    Calculate the relative ageing rate of the transformer for a given
-    Winding Hotspot Temperature
-    """
-
-    #As per AS60076.7 Eq. (2)
     try:
-        V = 2 ** ((WHST-98.0)/6)  #Applies to non-thermally upgraded paper only
+        V = 2 ** ((WHST-98.0)/6)
     except OverflowError:
-        V = 10000000.0            #High WHST numbers cause errors
-        
+        V = 10000000.0  # High WHST numbers cause errors
     return V

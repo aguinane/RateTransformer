@@ -1,3 +1,1 @@
-"""
-Name: Python Scripts
-"""
+import rate
