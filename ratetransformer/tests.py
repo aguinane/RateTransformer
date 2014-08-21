@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #----------------------------------------------------
 
 import unittest
@@ -54,13 +54,12 @@ class TestRateTx(unittest.TestCase):
 
 
     def test_converged_values(self):
-        (FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, 
-            CRF) = example_calculation()
-        self.assertEqual(Max_TOtemp, 71.61)
-        self.assertEqual(Max_WHStemp, 94.87)
-        self.assertEqual(LoL, 24.0)
-        self.assertEqual(Max_Load, 28.925)
-        self.assertEqual(CRF, 1.157)
+        TxRating = example_calculation()
+        self.assertEqual(TxRating['MaxTOTemp'], 71.61)
+        self.assertEqual(TxRating['MaxWHSTemp'], 94.87)
+        self.assertEqual(TxRating['Ageing'], 24.0)
+        self.assertEqual(TxRating['MaxLoad'], 28.925)
+        self.assertEqual(TxRating['CRF'], 1.157)
 
 if __name__ == '__main__':
     unittest.main()

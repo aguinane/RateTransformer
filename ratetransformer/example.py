@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #----------------------------------------------------
 
 from __future__ import print_function
@@ -13,20 +13,17 @@ def main():
     function with transformer details passed to function
     """
     
-    (FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, 
-        CRF) = example_calculation()
+    TxRating = example_calculation()
 
-    print('Results of example transformer calculation....')
-    print('-' * 20)
-    print('# of Iterations: ' + str(NumIter))
-    print('Reason for rating: ' + FinalReason)
-    print('Peak Load: ' + str(Max_Load))
-    print('Top Oil Temp: ' + str(Max_TOtemp))
-    print('WHS Temp: ' + str(Max_WHStemp))
-    print('CRF: ' + str(CRF))
-    print('Ageing: ' + str(LoL))
+    print('Results of example transformer calculation:')
+    print('# of Iterations: ', TxRating['NumIterations'])
+    print('Reason for rating: ', TxRating['Reason'])
+    print('Peak Load: ', TxRating['MaxLoad'])
+    print('Top Oil Temp: ', TxRating['MaxTOTemp'])
+    print('WHS Temp: ', TxRating['MaxWHSTemp'])
+    print('CRF: ', TxRating['CRF'])
+    print('Ageing: ', TxRating['Ageing'])
 
-    
 def example_calculation():
     """
     Provides some dummy data to demonstrate how to call the rating function
@@ -70,10 +67,9 @@ def example_calculation():
     TxSeasonal['AmbWHS'] = 24.72                # The monthly average temperature of the hottest month is used for the maximum hot-spot temp. calculation
     TxSeasonal['AmbAgeing'] = 27.85             # The yearly weighted ambient temperature is used for thermal ageing calculation
 
-    FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, CRF = rate.perform_rating(
-        TxHeatRun, TxLimits, TxDetails, TxSeasonal)
+    TxRating = rate.perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal)
 
-    return FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, CRF
+    return TxRating
 
 if __name__ == '__main__':
     main()

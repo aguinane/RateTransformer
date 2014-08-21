@@ -2,42 +2,13 @@
 import math
 
 
-def perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal):
+def perform_rating(HeatRunData, Limits, ThermalChar, TxSeasonal):
     """ Perform rating on a single transformer for specified rating limits
     """
-    # Do some error checking first
-    try:
-        if (TxHeatRun['RatedLoad'] == 0 
-                or TxHeatRun['dTOr'] == 0 
-                or TxHeatRun['gr'] == 0 
-                or TxHeatRun['R'] == 0):
-            # Heat run record doesn't exist or isn't populated
-            RecordExists = False
-        else:
-            # Heat run record exists - calculate optimal loading
-            RecordExists = True
-    except KeyError:
-        # Values aren't populated
-        RecordExists = False
 
-    if RecordExists == True:
-        (FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, 
-            NumIter) = calculate_transformer_rating(
-            TxDetails, TxLimits, TxHeatRun, TxSeasonal)
-        CRF = float(Max_Load) / float(TxHeatRun['RatedLoad'])
-        CRF = round(CRF, 4)
-    else:       
-        FinalReason = 'Nameplate - no test data'
-        Max_Load = float(TxHeatRun['RatedLoad']); CRF = 1.0
-        Max_TOtemp = 0.0; Max_WHStemp = 0.0; LoL = 0.0; NumIter = 0
+    # Create our output dictionary
+    TxRating = {}
 
-    return FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, CRF
-
-
-def calculate_transformer_rating(ThermalChar, Limits, HeatRunData, TxSeasonal):
-    """ Calulates the optimum load conditions for specified limits
-    """
-    
     # Define some intial values
     NumIter = 0
     Limit = False
@@ -83,19 +54,24 @@ def calculate_transformer_rating(ThermalChar, Limits, HeatRunData, TxSeasonal):
         IncrementFactor = (IncrementFactor / 2)
 
         # Round values to appropriate significant figures
-        Max_Load = round(Max_Load, 3)
-        Max_TOtemp = round(Max_TOtemp, 2)
-        Max_WHStemp = round(Max_WHStemp, 2)
-        LoL = round(L, 3)
+        TxRating['MaxLoad'] = round(Max_Load, 3)
+        TxRating['MaxTOTemp'] = round(Max_TOtemp, 2)
+        TxRating['MaxWHSTemp'] = round(Max_WHStemp, 2)
+        TxRating['Ageing'] = round(L, 3)
 
         # Check if converged early
         if IncrementFactor < 0.00001: # Check scaling factor is small
             if PrevPeak == Max_Load:
                 break
         PrevPeak = Max_Load
-    
 
-    return FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter
+    TxRating['CRF'] = round(Max_Load / HeatRunData['RatedLoad'],4)
+    TxRating['Reason'] = FinalReason
+    TxRating['NumIterations'] = NumIter
+
+
+    #return FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter
+    return TxRating
 
 
 def CalculateLimit(ScaleFactor, InputList):
@@ -168,6 +144,7 @@ def CalculateLimit(ScaleFactor, InputList):
 
     return Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, L
 
+
 def was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp, 
                       Max_WHStemp, LoL):
     """ Check if any limits were reached
@@ -206,6 +183,7 @@ def was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp,
             Reason = 'WHS Temp'
 
     return Limit, Reason
+
 
 def calc_winding_rise(t, StartTemp, Load, HeatRunData, 
                       ThermalChar, LoadIncreasing):
@@ -253,7 +231,8 @@ def calc_winding_rise(t, StartTemp, Load, HeatRunData,
         dWHSt = dWHS + (StartTemp-dWHS) * math.exp((-t)/(ThermalChar['TauW']))
 
     return dWHSt
-    
+
+
 def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
     """ Calculate top oil rise
     Input values:
@@ -282,7 +261,7 @@ def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
             else:
                TauR = 210.0 
     else:
-        # Calculate Value
+        # Calculate the Tau value
         TauR = thermal_time_constant_at_rated_load(ThermalChar['C'], 
             HeatRunData['P'], HeatRunData['dTOr'])
     # Determine the oil thermal time constant - specified load
