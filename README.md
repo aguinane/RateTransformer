@@ -13,8 +13,8 @@ python setup.py install
 The following will return the iteration results:
 ```
 import ratetransformer
-(FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter, 
-       CRF) = ratetransformer.perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal)
+TxRating = ratetransformer.perform_rating(TxHeatRun, TxLimits, TxDetails, TxSeasonal)
+print(TxRating)
 ```
 ## Process Overview
 Start the model with initial oil temperature of zero.
