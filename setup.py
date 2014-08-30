@@ -8,7 +8,7 @@ from distutils.core import setup
 setup(
     name = 'ratetransformer',
     packages = ['ratetransformer'],
-    version = '1.0.0',
+    version = '1.1.0',
     description = 'Rate Transformer',
     author='A Guinane',
     url='https://github.com/aguin/RateTransformer',

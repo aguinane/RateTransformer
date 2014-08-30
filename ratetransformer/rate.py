@@ -2,9 +2,15 @@
 import math
 
 
-def perform_rating(HeatRunData, Limits, ThermalChar, TxSeasonal):
+def perform_rating(TxData):
     """ Perform rating on a single transformer for specified rating limits
     """
+
+    # Load input dictionary
+    Limits = TxData['Limits']
+    HeatRunData = TxData['HeatRun']
+    ThermalChar = TxData['Nameplate']
+    TxSeasonal = TxData['Seasonal']
 
     # Create our output dictionary
     TxRating = {}
@@ -69,8 +75,6 @@ def perform_rating(HeatRunData, Limits, ThermalChar, TxSeasonal):
     TxRating['Reason'] = FinalReason
     TxRating['NumIterations'] = NumIter
 
-
-    #return FinalReason, Max_Load, Max_TOtemp, Max_WHStemp, LoL, NumIter
     return TxRating
 
 

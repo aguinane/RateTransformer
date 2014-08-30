@@ -3,7 +3,7 @@
 
 import unittest
 import rate
-from example import example_calculation
+import json
 
 class TestRateTx(unittest.TestCase):
     """
@@ -54,7 +54,9 @@ class TestRateTx(unittest.TestCase):
 
 
     def test_converged_values(self):
-        TxRating = example_calculation()
+        with open('example1.json', newline='') as json_file:
+            json_data = json.load(json_file)
+        TxRating = rate.perform_rating(json_data)
         self.assertEqual(TxRating['MaxTOTemp'], 71.61)
         self.assertEqual(TxRating['MaxWHSTemp'], 94.87)
         self.assertEqual(TxRating['Ageing'], 24.0)
