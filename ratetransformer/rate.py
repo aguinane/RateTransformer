@@ -1,81 +1,81 @@
-#!/usr/bin/env python
 import math
 
-
-def perform_rating(TxData):
-    """ Perform rating on a single transformer for specified rating limits
+class Transformer:
+    """ A Power Transformer object
     """
+    def __init__(self, HeatRunData, ThermalChar, TxSeasonal):
+        self.HeatRunData = HeatRunData
+        self.ThermalChar = ThermalChar
+        self.TxSeasonal = TxSeasonal
 
-    # Load input dictionary
-    Limits = TxData['Limits']
-    HeatRunData = TxData['HeatRun']
-    ThermalChar = TxData['Nameplate']
-    TxSeasonal = TxData['Seasonal']
 
-    # Create our output dictionary
-    TxRating = {}
+    def perform_rating(self, Limits):
+        """ Perform rating on a single transformer for specified rating limits
+        """
 
-    # Define some intial values
-    NumIter = 0
-    Limit = False
-    PrevPeak = 0.0001
-    InputList = (TxSeasonal['t'], HeatRunData, ThermalChar, Limits, 
-                TxSeasonal['AmbWHS'], TxSeasonal['AmbAgeing'], 
-                TxSeasonal['LoadShape'])
+        HeatRunData = self.HeatRunData
+        ThermalChar = self.ThermalChar
+        TxSeasonal = self.TxSeasonal
 
-    # Calculate the starting scaling
-    RatedLoad = HeatRunData['RatedLoad']
-    MaxLoad = max(TxSeasonal['LoadShape'])
-    #Start by incrementing by double max load
-    IncrementFactor = (float(RatedLoad) / float(MaxLoad)) 
-    ScaleFactor = IncrementFactor * 0.5 #Start with half initial load
+        # Define some intial values
+        NumIter = 0
+        Limit = False
+        PrevPeak = 0.0001
+        InputList = (TxSeasonal['t'], self.HeatRunData, ThermalChar, Limits,
+                    TxSeasonal['AmbWHS'], TxSeasonal['AmbAgeing'],
+                    TxSeasonal['LoadShape'])
 
-    if IncrementFactor < 0.5:
-        IncrementFactor = 0.5 # Start at half way
+        # Calculate the starting scaling
+        RatedLoad = HeatRunData['RatedLoad']
+        MaxLoad = max(TxSeasonal['LoadShape'])
+        #Start by incrementing by double max load
+        IncrementFactor = (float(RatedLoad) / float(MaxLoad))
+        ScaleFactor = IncrementFactor * 0.5 #Start with half initial load
 
-    if ScaleFactor < 0.2:
-        ScaleFactor = 0.2 # Start reasonably high
-    
-    FinalReason = 'Did not converge' # Stops errors later
-    
-    # Loop until scaling factor is sufficiently small
-    maxIterations = 150
-    for i in range(maxIterations):
-        while Limit == False:
-            (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, 
+        if IncrementFactor < 0.5:
+            IncrementFactor = 0.5 # Start at half way
+
+        if ScaleFactor < 0.2:
+            ScaleFactor = 0.2 # Start reasonably high
+
+        FinalReason = 'Did not converge' # Stops errors later
+
+        # Loop until scaling factor is sufficiently small
+        maxIterations = 150
+        for i in range(maxIterations):
+            while Limit == False:
+                (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp,
+                    L) = CalculateLimit(ScaleFactor, InputList)
+                NumIter += 1
+                ScaleFactor += IncrementFactor
+                FinalReason = Reason # So its not lost
+
+            # Step back to where limit wasn't reached to get optimal rating
+            ScaleFactor = ScaleFactor - (2 * IncrementFactor)
+            # Check scale factor isn't negative
+            if ScaleFactor < 0:
+                ScaleFactor = 0
+            (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp,
                 L) = CalculateLimit(ScaleFactor, InputList)
-            NumIter += 1
-            ScaleFactor += IncrementFactor
-            FinalReason = Reason # So its not lost
-            
-        # Step back to where limit wasn't reached to get optimal rating
-        ScaleFactor = ScaleFactor - (2 * IncrementFactor)
-        # Check scale factor isn't negative
-        if ScaleFactor < 0:
-            ScaleFactor = 0
-        (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, 
-            L) = CalculateLimit(ScaleFactor, InputList)    
 
-        # Decrese the amount scaled for next iteration run
-        IncrementFactor = (IncrementFactor / 2)
+            # Decrese the amount scaled for next iteration run
+            IncrementFactor = (IncrementFactor / 2)
 
-        # Round values to appropriate significant figures
-        TxRating['MaxLoad'] = round(Max_Load, 3)
-        TxRating['MaxTOTemp'] = round(Max_TOtemp, 2)
-        TxRating['MaxWHSTemp'] = round(Max_WHStemp, 2)
-        TxRating['Ageing'] = round(L, 3)
+            # Round values to appropriate significant figures
+            self.MaxLoad = round(Max_Load, 3)
+            self.MaxTOTemp = round(Max_TOtemp, 2)
+            self.MaxWHSTemp = round(Max_WHStemp, 2)
+            self.Ageing = round(L, 3)
 
-        # Check if converged early
-        if IncrementFactor < 0.00001: # Check scaling factor is small
-            if PrevPeak == Max_Load:
-                break
-        PrevPeak = Max_Load
+            # Check if converged early
+            if IncrementFactor < 0.00001: # Check scaling factor is small
+                if PrevPeak == Max_Load:
+                    break
+            PrevPeak = Max_Load
 
-    TxRating['CRF'] = round(Max_Load / HeatRunData['RatedLoad'],4)
-    TxRating['Reason'] = FinalReason
-    TxRating['NumIterations'] = NumIter
-
-    return TxRating
+        self.CRF = round(Max_Load / HeatRunData['RatedLoad'],4)
+        self.Reason = FinalReason
+        self.NumIterations = NumIter
 
 
 def CalculateLimit(ScaleFactor, InputList):
