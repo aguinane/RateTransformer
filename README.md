@@ -27,5 +27,6 @@ Iterate until oil temperature stabilises for given daily load shape.
 ![Screenshot](/docs/curve_1.png?raw=true "Transformer Model")
 
 Increment load magnitude until one of the passed limits are breached.
-![Screenshot](/docs/curve_2.png?raw=true "Transformer Model")
 (In this case the winding hotspot temperature has reached 120 degrees)
+![Screenshot](/docs/curve_2.png?raw=true "Transformer Model")
+
