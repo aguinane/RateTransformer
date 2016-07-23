@@ -23,7 +23,7 @@
                 "C": 10507.3,
                 "k21": 2.0,
                 "TauW": 7.0,
-                "CoolingType": "ONAN",
+                "CoolingMode": "ONAN",
                 "k22": 2.0,
                 "x": 1.0,
                 "n": 0.8

@@ -5,9 +5,7 @@ class Transformer:
     """
     def __init__(self, HeatRunData, ThermalChar):
         self.HeatRunData = HeatRunData
-
         self.RatedLoad = HeatRunData['RatedLoad']
-
         self.ThermalChar = ThermalChar
 
 
@@ -184,23 +182,12 @@ def calc_winding_rise(t, StartTemp, Load, HeatRunData,
     ThermalChar is a dict with thermal characteristics for cooling mode
     """ 
 
-    # Determine the oil thermal time constant - rated load
-    if ThermalChar['C'] == 0:
-        # Use Lookup Table - AS 60077.7-2013 Table 5
-        cooling_mode = ThermalChar['CoolingType']
+    CoolingMode = ThermalChar['CoolingMode']
+    C = ThermalChar['C']
+    P = HeatRunData['P']
+    dTOr = HeatRunData['dTOr']
+    TauR = determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr)
 
-        if any(cooling_mode in s for s in ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']):
-            TauR = 90.0
-        else:
-            if any(cooling_mode in s for s in ['ONAF', 'OB']):
-                TauR = 150.0
-            else:
-               TauR = 210.0 
-    else:
-        # Calculate Value
-        TauR = thermal_time_constant_at_rated_load(ThermalChar['C'], 
-            HeatRunData['P'], HeatRunData['dTOr'])
-        
     # Calculate ultimate winding rise to simplify below formulas
     K = float(Load / HeatRunData['RatedLoad'])
     dWHS = HeatRunData['H'] * HeatRunData['gr'] * (K ** ThermalChar['y'])
@@ -234,29 +221,21 @@ def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
     # Determine ultimate (steady state) temperature for given load
     dTOult = ult_top_oil_rise_at_load(K, HeatRunData['R'], 
         HeatRunData['dTOr'], ThermalChar['x'])
-    # Determine the oil thermal time constant - rated load
-    if ThermalChar['C'] == 0:
-        # Use Lookup Table - AS 60077.7-2013 Table 5
-        CoolingType = ThermalChar['CoolingType']
-        Cooling_List = ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']
-        if any(CoolingType in s for s in Cooling_List):
-            TauR = 90.0
-        else:
-            Cooling_List = ['ONAF', 'OB']
-            if any(CoolingType in s for s in Cooling_List):
-                TauR = 150.0
-            else:
-               TauR = 210.0 
-    else:
-        # Calculate the Tau value
-        TauR = thermal_time_constant_at_rated_load(ThermalChar['C'], 
-            HeatRunData['P'], HeatRunData['dTOr'])
+
+    CoolingMode = ThermalChar['CoolingMode']
+    C = ThermalChar['C']
+    P = HeatRunData['P']
+    dTOr = HeatRunData['dTOr']
+    TauR = determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr)
+
     # Determine the oil thermal time constant - specified load
     Tau = thermal_time_constant_as_considered_load(TauR,HeatRunData['dTOr'],
         dTOi, dTOult, ThermalChar['n'] )
     # Determine instantaneous top oil temperature for given load
     dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, ThermalChar['k11'], Tau)
     return dTO
+
+
 
 
 def ult_top_oil_rise_at_load(K, R, dTOr, x):
@@ -279,6 +258,24 @@ def inst_top_oil_rise_at_load(dTOi, dTOult, t, k11, Tau):
     dTO = dTOult + (dTOi - dTOult) * math.exp((-t)/(k11*Tau))
 
     return dTO
+
+
+def determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr):
+    """ Determine the oil thermal time constant - rated load
+    """
+    if C == 0:
+        # Use Lookup Table - AS 60077.7-2013 Table 5
+        if any(CoolingMode in s for s in ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']):
+            TauR = 90.0
+        else:
+            if any(CoolingMode in s for s in ['ONAF', 'OB']):
+                TauR = 150.0
+            else:
+               TauR = 210.0
+    else:
+        # Calculate the Tau value
+        TauR = thermal_time_constant_at_rated_load(C, P, dTOr)
+    return TauR
 
 
 def thermal_time_constant_at_rated_load(C, P, dTOr):
