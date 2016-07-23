@@ -14,17 +14,18 @@ class Transformer:
     def perform_rating(self, t, AmbWHS, AmbAgeing, LoadShape, Limits):
         """ Perform rating on a single transformer for specified rating limits
         """
-        self.t = t
+
         self.AmbWHS = AmbWHS
         self.AmbAgeing = AmbAgeing
-        self.LoadShape = LoadShape
+        self.LoadShape = LoadShape # Load to be considered (in MVA)
+        self.t = t  # Time Interval(min)
 
         self.MaxLoadLimit = Limits['MaxLoadPU']
         self.TopOilLimit = Limits['TopOil']
         self.WHSLimit = Limits['HotSpot']
         self.LoLLimit = Limits['LoL']
 
-        # Define some intial values
+        # Define some initial values
         NumIter = 0
         Limit = False
         PrevPeak = 0.0001
@@ -32,7 +33,7 @@ class Transformer:
         # Calculate the starting scaling
         RatedLoad = self.HeatRunData['RatedLoad']
         MaxLoad = max(self.LoadShape)
-        #Start by incrementing by double max load
+        # Start by incrementing by double max load
         IncrementFactor = (float(RatedLoad) / float(MaxLoad))
         ScaleFactor = IncrementFactor * 0.5 #Start with half initial load
 
@@ -157,16 +158,16 @@ class Transformer:
 
         LoadPu = (Max_Load / self.RatedLoad)
         if LoadPu >= self.MaxLoadLimit:
-            self.RatingReason = 'Exceed '+str(self.MaxLoadLimit)+' pu'
+            self.RatingReason = 'CRF of '+str(self.MaxLoadLimit)+' pu'
             return True
         elif Max_TOtemp >= self.TopOilLimit:
-            self.RatingReason = 'Exceed Top Oil Temp of ' + str(self.TopOilLimit) + '°'
+            self.RatingReason = 'TO of ' + str(self.TopOilLimit) + '°'
             return True
         elif Max_WHStemp >= self.WHSLimit:
-            self.RatingReason = 'Exceed WHS Temp of ' + str(self.WHSLimit) + '°'
+            self.RatingReason = 'WHS ' + str(self.WHSLimit) + '°'
             return True
         elif LoL >= self.LoLLimit:
-            self.RatingReason = 'Exceed allowed ageing of ' + str(self.LoLLimit) + 'hrs/day'
+            self.RatingReason = 'Age of ' + str(self.LoLLimit) + 'hrs/day'
             return True
         else:
             return False
@@ -180,19 +181,18 @@ def calc_winding_rise(t, StartTemp, Load, HeatRunData,
     StartTemp = Initial Top Oil Rise
     Load = Load to be considered (in MVA)
     HeatRunData is a dict with test results
-    ThermalChar is a dict with thermal characteristics for cooling type
+    ThermalChar is a dict with thermal characteristics for cooling mode
     """ 
 
     # Determine the oil thermal time constant - rated load
     if ThermalChar['C'] == 0:
         # Use Lookup Table - AS 60077.7-2013 Table 5
-        CoolingType = ThermalChar['CoolingType']
-        Cooling_List = ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']
-        if any(CoolingType in s for s in Cooling_List):
+        cooling_mode = ThermalChar['CoolingType']
+
+        if any(cooling_mode in s for s in ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']):
             TauR = 90.0
         else:
-            Cooling_List = ['ONAF', 'OB']
-            if any(CoolingType in s for s in Cooling_List):
+            if any(cooling_mode in s for s in ['ONAF', 'OB']):
                 TauR = 150.0
             else:
                TauR = 210.0 
@@ -255,8 +255,7 @@ def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
     Tau = thermal_time_constant_as_considered_load(TauR,HeatRunData['dTOr'],
         dTOi, dTOult, ThermalChar['n'] )
     # Determine instantaneous top oil temperature for given load
-    dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, K, HeatRunData['R'], 
-            HeatRunData['dTOr'], ThermalChar['x'], ThermalChar['k11'], Tau)
+    dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, ThermalChar['k11'], Tau)
     return dTO
 
 
@@ -273,7 +272,7 @@ def ult_top_oil_rise_at_load(K, R, dTOr, x):
     return dTO
 
 
-def inst_top_oil_rise_at_load(dTOi, dTOult, t, K, R, dTOr, x, k11, Tau):
+def inst_top_oil_rise_at_load(dTOi, dTOult, t, k11, Tau):
     """ Calculate the instanous top oil rise at a given time period
     """
     # As per AS60076.7 Eq. (2)

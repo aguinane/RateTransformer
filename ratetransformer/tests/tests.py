@@ -30,7 +30,7 @@ class TestRateTx(unittest.TestCase):
         self.assertEqual(tx.Ageing, 24.0)
         self.assertEqual(tx.MaxLoad, 28.925)
         self.assertEqual(tx.CRF, 1.157)
-        self.assertEqual(tx.RatingReason, 'Exceed allowed ageing of 24.0hrs/day')
+        self.assertEqual(tx.RatingReason, 'Age of 24.0hrs/day')
 
 class TestRatingFunctions(unittest.TestCase):
     """ Tests specific functions
@@ -53,8 +53,8 @@ class TestRatingFunctions(unittest.TestCase):
         self.assertAlmostEqual(val,164.77, places=2)
 
     def test_inst_top_oil(self):
-        (dTOi, dTOult, t, K, R, dTOr, x, k11, Tau) = (25.60, 20.2302034, 30, 0.59006874, 10.253876, 41.6, 0.8, 0.5, 164.76996)
-        val = rate.inst_top_oil_rise_at_load(dTOi, dTOult, t, K, R, dTOr, x, k11, Tau)
+        (dTOi, dTOult, t, k11, Tau) = (25.60, 20.2302034, 30, 0.5, 164.76996)
+        val = rate.inst_top_oil_rise_at_load(dTOi, dTOult, t, k11, Tau)
         self.assertAlmostEqual(val, 23.96, places=2)
 
     def test_ult_top_oil(self):

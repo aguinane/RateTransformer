@@ -7,7 +7,7 @@
               }, 
     "HeatRun": {
                 "TestId": "1", 
-                "Cooling": "ONAN", 
+                "CoolingMode": "ONAN",
                 "RatedLoad": 25.0, 
                 "dTOr": 35.4, 
                 "gr": 14.8, 
