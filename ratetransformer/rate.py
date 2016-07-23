@@ -3,31 +3,35 @@ import math
 class Transformer:
     """ A Power Transformer object
     """
-    def __init__(self, HeatRunData, ThermalChar, TxSeasonal):
+    def __init__(self, HeatRunData, ThermalChar):
         self.HeatRunData = HeatRunData
+
+        self.RatedLoad = HeatRunData['RatedLoad']
+
         self.ThermalChar = ThermalChar
-        self.TxSeasonal = TxSeasonal
 
 
-    def perform_rating(self, Limits):
+    def perform_rating(self, t, AmbWHS, AmbAgeing, LoadShape, Limits):
         """ Perform rating on a single transformer for specified rating limits
         """
+        self.t = t
+        self.AmbWHS = AmbWHS
+        self.AmbAgeing = AmbAgeing
+        self.LoadShape = LoadShape
 
-        HeatRunData = self.HeatRunData
-        ThermalChar = self.ThermalChar
-        TxSeasonal = self.TxSeasonal
+        self.MaxLoadLimit = Limits['MaxLoadPU']
+        self.TopOilLimit = Limits['TopOil']
+        self.WHSLimit = Limits['HotSpot']
+        self.LoLLimit = Limits['LoL']
 
         # Define some intial values
         NumIter = 0
         Limit = False
         PrevPeak = 0.0001
-        InputList = (TxSeasonal['t'], self.HeatRunData, ThermalChar, Limits,
-                    TxSeasonal['AmbWHS'], TxSeasonal['AmbAgeing'],
-                    TxSeasonal['LoadShape'])
 
         # Calculate the starting scaling
-        RatedLoad = HeatRunData['RatedLoad']
-        MaxLoad = max(TxSeasonal['LoadShape'])
+        RatedLoad = self.HeatRunData['RatedLoad']
+        MaxLoad = max(self.LoadShape)
         #Start by incrementing by double max load
         IncrementFactor = (float(RatedLoad) / float(MaxLoad))
         ScaleFactor = IncrementFactor * 0.5 #Start with half initial load
@@ -38,25 +42,26 @@ class Transformer:
         if ScaleFactor < 0.2:
             ScaleFactor = 0.2 # Start reasonably high
 
-        FinalReason = 'Did not converge' # Stops errors later
+        self.RatingReason = 'Did not converge' # Stops errors later
 
         # Loop until scaling factor is sufficiently small
         maxIterations = 150
         for i in range(maxIterations):
             while Limit == False:
-                (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp,
-                    L) = CalculateLimit(ScaleFactor, InputList)
+                (Limit, Max_Load, Max_TOtemp, Max_WHStemp,
+                    L) = self.CalculateLimit(ScaleFactor, t, self.HeatRunData, self.ThermalChar,
+                    Limits, AmbWHS, AmbAgeing, LoadShape)
                 NumIter += 1
                 ScaleFactor += IncrementFactor
-                FinalReason = Reason # So its not lost
 
             # Step back to where limit wasn't reached to get optimal rating
             ScaleFactor = ScaleFactor - (2 * IncrementFactor)
             # Check scale factor isn't negative
             if ScaleFactor < 0:
                 ScaleFactor = 0
-            (Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp,
-                L) = CalculateLimit(ScaleFactor, InputList)
+            (Limit, Max_Load, Max_TOtemp, Max_WHStemp,
+                L) = self.CalculateLimit(ScaleFactor, t, self.HeatRunData, self.ThermalChar,
+                    Limits, AmbWHS, AmbAgeing, LoadShape)
 
             # Decrese the amount scaled for next iteration run
             IncrementFactor = (IncrementFactor / 2)
@@ -73,120 +78,98 @@ class Transformer:
                     break
             PrevPeak = Max_Load
 
-        self.CRF = round(Max_Load / HeatRunData['RatedLoad'],4)
-        self.Reason = FinalReason
+        self.CRF = round(self.MaxLoad / self.HeatRunData['RatedLoad'],4)
         self.NumIterations = NumIter
 
 
-def CalculateLimit(ScaleFactor, InputList):
-    """ Scales load and checks whether limit will be breached
-    """
-    (t, HeatRunData, ThermalChar, Limits, AmbWHS, AmbAgeing, 
-        LoadShape) = InputList
-    TempLoadShape = [i * ScaleFactor for i in LoadShape]
+    def CalculateLimit(self, ScaleFactor, t, HeatRunData, ThermalChar,
+                    Limits, AmbWHS, AmbAgeing, LoadShape):
+        """ Scales load and checks whether limit will be breached
+        """
+        TempLoadShape = [i * ScaleFactor for i in LoadShape]
 
-    # Initial Temperatures as Zero
-    TOinitial = 0; WHSinitial = 0
+        # Initial Temperatures as Zero
+        TOinitial = 0; WHSinitial = 0
 
-    # Iterate until starting and ending top oil temp are the same
-    for i in range(25): #Stop after 25 iterations if not converged
+        # Iterate until starting and ending top oil temp are the same
+        for i in range(25): #Stop after 25 iterations if not converged
 
-        # Set up containers for final results
-        List_TOtemp = []; List_WHStemp = []; List_V = []
+            # Set up containers for final results
+            List_TOtemp = []; List_WHStemp = []; List_V = []
 
-        # Set starting temperatures to final in previous run
-        TOprev = TOinitial; WHSprev = WHSinitial
-            
-        # Loop through loads values
-        for index, Load in enumerate(TempLoadShape):
-            # Check if load is bigger than previous
-            PrevLoad = TempLoadShape[index - 1]
-            if Load > PrevLoad:
-                LoadIncreasing = True
-            else:
-                LoadIncreasing = False
-        
-            TOrise = calc_top_oil_rise(t, TOprev, Load, 
-                HeatRunData, ThermalChar)
-            TOtemp = AmbWHS + TOrise
-     
-            WHSrise = calc_winding_rise(t, WHSprev, Load, HeatRunData, 
-                ThermalChar,LoadIncreasing)
-            WHStemp = AmbWHS + TOrise + WHSrise
-            WHSageing = AmbAgeing + TOrise + WHSrise
-            V = relative_ageing_rate(WHSageing)
+            # Set starting temperatures to final in previous run
+            TOprev = TOinitial; WHSprev = WHSinitial
 
-            List_TOtemp.append(TOtemp)
-            List_WHStemp.append(WHStemp)
-            List_V.append(V)
-            
-            # Set final temps as starting temperature for next in loop
-            TOprev = TOrise
-            WHSprev = WHSrise
-            
-        # Check if converged early
-        if TOinitial == TOrise:
-            break # Exit loop
-        
-        # Set ending temperatures to initial 
-        TOinitial = TOrise
-        WHSinitial = WHSrise
+            # Loop through loads values
+            for index, Load in enumerate(TempLoadShape):
+                # Check if load is bigger than previous
+                PrevLoad = TempLoadShape[index - 1]
+                if Load > PrevLoad:
+                    LoadIncreasing = True
+                else:
+                    LoadIncreasing = False
 
-    # Calculate the maximum and total values
-    RatedLoad = HeatRunData['RatedLoad']
-    Max_Load = max(TempLoadShape)
-    Max_TOtemp = max(List_TOtemp)
-    Max_WHStemp = max(List_WHStemp)
+                TOrise = calc_top_oil_rise(t, TOprev, Load,
+                    HeatRunData, ThermalChar)
+                TOtemp = AmbWHS + TOrise
 
-    L = 0 
-    for V in List_V:
-        L += (V * t)  # Sum loss of life in minutes for each interval
-    L = L / 60        # Calculate loss of life in hours
-   
-    Limit, Reason = was_limit_reached(Limits, RatedLoad, Max_Load, 
-        Max_TOtemp, Max_WHStemp, L)
+                WHSrise = calc_winding_rise(t, WHSprev, Load, HeatRunData,
+                    ThermalChar,LoadIncreasing)
+                WHStemp = AmbWHS + TOrise + WHSrise
+                WHSageing = AmbAgeing + TOrise + WHSrise
+                V = relative_ageing_rate(WHSageing)
 
-    return Limit, Reason, Max_Load, Max_TOtemp, Max_WHStemp, L
+                List_TOtemp.append(TOtemp)
+                List_WHStemp.append(WHStemp)
+                List_V.append(V)
+
+                # Set final temps as starting temperature for next in loop
+                TOprev = TOrise
+                WHSprev = WHSrise
+
+            # Check if converged early
+            if TOinitial == TOrise:
+                break # Exit loop
+
+            # Set ending temperatures to initial
+            TOinitial = TOrise
+            WHSinitial = WHSrise
+
+        # Calculate the maximum and total values
+
+        Max_Load = max(TempLoadShape)
+        Max_TOtemp = max(List_TOtemp)
+        Max_WHStemp = max(List_WHStemp)
+
+        L = 0
+        for V in List_V:
+            L += (V * t)  # Sum loss of life in minutes for each interval
+        L = L / 60        # Calculate loss of life in hours
+
+        Limit = self.was_limit_reached(Max_Load, Max_TOtemp, Max_WHStemp, L)
+
+        return Limit, Max_Load, Max_TOtemp, Max_WHStemp, L
 
 
-def was_limit_reached(Limits, RatedLoad, Max_Load, Max_TOtemp, 
-                      Max_WHStemp, LoL):
-    """ Check if any limits were reached
-    """
-    
-    Limit = False
-    Reason = 'Limit not reached'
-    LoadPu = (Max_Load / RatedLoad)
-    
-    if LoadPu >= Limits['MaxLoadPU']:
-        Limit = True
-        try:
-            Reason = Limits['MaxLoadPU_Reason']
-        except KeyError:
-            Reason = '1.5 pu'
+    def was_limit_reached(self, Max_Load, Max_TOtemp, Max_WHStemp, LoL):
+        """ Determine if any of the specified limits were reached
+        """
 
-    if LoL >= Limits['LoL']:
-        Limit = True
-        try:
-            Reason = Limits['LoL_Reason']
-        except KeyError:
-            Reason = 'Loss of Life'
-            
-    if Max_TOtemp >= Limits['TopOil']:
-        Limit = True
-        try:
-            Reason = Limits['TopOil_Reason']
-        except KeyError:
-            Reason = 'Top Oil Temp'
-
-    if Max_WHStemp >= Limits['HotSpot']:
-        Limit = True
-        try:
-            Reason = Limits['HotSpot_Reason']
-        except KeyError:
-            Reason = 'WHS Temp'
-
-    return Limit, Reason
+        LoadPu = (Max_Load / self.RatedLoad)
+        if LoadPu >= self.MaxLoadLimit:
+            self.RatingReason = 'Exceed '+str(self.MaxLoadLimit)+' pu'
+            return True
+        elif Max_TOtemp >= self.TopOilLimit:
+            self.RatingReason = 'Exceed Top Oil Temp of ' + str(self.TopOilLimit) + '°'
+            return True
+        elif Max_WHStemp >= self.WHSLimit:
+            self.RatingReason = 'Exceed WHS Temp of ' + str(self.WHSLimit) + '°'
+            return True
+        elif LoL >= self.LoLLimit:
+            self.RatingReason = 'Exceed allowed ageing of ' + str(self.LoLLimit) + 'hrs/day'
+            return True
+        else:
+            return False
 
 
 def calc_winding_rise(t, StartTemp, Load, HeatRunData, 

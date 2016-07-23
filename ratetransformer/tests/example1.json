@@ -1,13 +1,9 @@
 {
     "Limits": {
-                "MaxLoadPU": 1.5, 
-                "MaxLoadPU_Reason": "1.5pu", 
-                "HotSpot": 120.0, 
-                "HotSpot_Reason": "WHS Temp", 
-                "TopOil": 105.0, 
-                "TopOil_Reason": "Top Oil Temp", 
-                "LoL": 24.0, 
-                "LoL_Reason": "Ageing"
+                "MaxLoadPU": 1.5,
+                "HotSpot": 120.0,
+                "TopOil": 105.0,
+                "LoL": 24.0
               }, 
     "HeatRun": {
                 "TestId": "1", 

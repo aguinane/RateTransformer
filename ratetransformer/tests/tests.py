@@ -10,18 +10,27 @@ class TestRateTx(unittest.TestCase):
     def test_converged_values(self):
         with open('example1.json', newline='') as json_file:
             jsondata = json.load(json_file)
-        Limits = jsondata['Limits']
+
         HeatRunData = jsondata['HeatRun']
         ThermalChar = jsondata['Nameplate']
-        TxSeasonal = jsondata['Seasonal']
 
-        tx = Transformer(HeatRunData, ThermalChar, TxSeasonal)
-        tx.perform_rating(Limits)
+        tx = Transformer(HeatRunData, ThermalChar)
+
+        TxSeasonal = jsondata['Seasonal']
+        t = TxSeasonal['t']
+        AmbWHS = TxSeasonal['AmbWHS']
+        AmbAgeing = TxSeasonal['AmbAgeing']
+        LoadShape = TxSeasonal['LoadShape']
+        Limits = jsondata['Limits']
+
+        tx.perform_rating(t, AmbWHS, AmbAgeing, LoadShape, Limits)
+
         self.assertEqual(tx.MaxTOTemp, 71.61)
         self.assertEqual(tx.MaxWHSTemp, 94.87)
         self.assertEqual(tx.Ageing, 24.0)
         self.assertEqual(tx.MaxLoad, 28.925)
         self.assertEqual(tx.CRF, 1.157)
+        self.assertEqual(tx.RatingReason, 'Exceed allowed ageing of 24.0hrs/day')
 
 class TestRatingFunctions(unittest.TestCase):
     """ Tests specific functions

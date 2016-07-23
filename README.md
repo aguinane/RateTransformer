@@ -14,8 +14,8 @@ python setup.py install
 The following will return the peak load rating:
 ```
 from ratetransformer import Transformer
-tx = Transformer(HeatRunData, ThermalChar, TxSeasonal)
-tx.perform_rating(Limits)
+tx = Transformer(HeatRunData, ThermalChar)
+tx.perform_rating(t, AmbWHS, AmbAgeing, LoadShape, Limits)
 print(tx.MaxLoad)
 ```
 
