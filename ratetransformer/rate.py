@@ -158,16 +158,16 @@ class Transformer:
 
         LoadPu = (Max_Load / self.RatedLoad)
         if LoadPu >= self.MaxLoadLimit:
-            self.RatingReason = 'CRF of '+str(self.MaxLoadLimit)+' pu'
+            self.RatingReason = 'CRF'
             return True
         elif Max_TOtemp >= self.TopOilLimit:
-            self.RatingReason = 'TO of ' + str(self.TopOilLimit) + '°'
+            self.RatingReason = 'TO'
             return True
         elif Max_WHStemp >= self.WHSLimit:
-            self.RatingReason = 'WHS ' + str(self.WHSLimit) + '°'
+            self.RatingReason = 'WHS'
             return True
         elif LoL >= self.LoLLimit:
-            self.RatingReason = 'Age of ' + str(self.LoLLimit) + 'hrs/day'
+            self.RatingReason = 'Age'
             return True
         else:
             return False

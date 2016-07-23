@@ -8,29 +8,33 @@ class TestRateTx(unittest.TestCase):
     """
 
     def test_converged_values(self):
-        with open('example1.json', newline='') as json_file:
-            jsondata = json.load(json_file)
 
-        HeatRunData = jsondata['HeatRun']
-        ThermalChar = jsondata['Nameplate']
+        examples = ['example1.json']
+        for example in examples:
+            with open(example, newline='') as json_file:
+                jsondata = json.load(json_file)
 
-        tx = Transformer(HeatRunData, ThermalChar)
+            HeatRunData = jsondata['HeatRun']
+            ThermalChar = jsondata['Nameplate']
 
-        TxSeasonal = jsondata['Seasonal']
-        t = TxSeasonal['t']
-        AmbWHS = TxSeasonal['AmbWHS']
-        AmbAgeing = TxSeasonal['AmbAgeing']
-        LoadShape = TxSeasonal['LoadShape']
-        Limits = jsondata['Limits']
+            tx = Transformer(HeatRunData, ThermalChar)
 
-        tx.perform_rating(t, AmbWHS, AmbAgeing, LoadShape, Limits)
+            TxSeasonal = jsondata['Seasonal']
+            t = TxSeasonal['t']
+            AmbWHS = TxSeasonal['AmbWHS']
+            AmbAgeing = TxSeasonal['AmbAgeing']
+            LoadShape = TxSeasonal['LoadShape']
+            Limits = jsondata['Limits']
 
-        self.assertEqual(tx.MaxTOTemp, 71.61)
-        self.assertEqual(tx.MaxWHSTemp, 94.87)
-        self.assertEqual(tx.Ageing, 24.0)
-        self.assertEqual(tx.MaxLoad, 28.925)
-        self.assertEqual(tx.CRF, 1.157)
-        self.assertEqual(tx.RatingReason, 'Age of 24.0hrs/day')
+            tx.perform_rating(t, AmbWHS, AmbAgeing, LoadShape, Limits)
+
+            Results = jsondata['ExpectedResults']
+            self.assertEqual(tx.MaxTOTemp, Results['MaxTOTemp'])
+            self.assertEqual(tx.MaxWHSTemp, Results['MaxWHSTemp'])
+            self.assertEqual(tx.Ageing, Results['Ageing'])
+            self.assertEqual(tx.MaxLoad, Results['MaxLoad'])
+            self.assertEqual(tx.CRF, Results['CRF'])
+            self.assertEqual(tx.RatingReason, Results['RatingReason'])
 
 class TestRatingFunctions(unittest.TestCase):
     """ Tests specific functions
