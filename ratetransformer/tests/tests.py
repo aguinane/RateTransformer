@@ -20,13 +20,12 @@ class TestRateTx(unittest.TestCase):
             tx = Transformer(HeatRunData, ThermalChar)
 
             TxSeasonal = jsondata['Seasonal']
-            t = TxSeasonal['t']
             AmbWHS = TxSeasonal['AmbWHS']
             AmbAgeing = TxSeasonal['AmbAgeing']
             LoadShape = TxSeasonal['LoadShape']
             Limits = jsondata['Limits']
 
-            tx.perform_rating(t, AmbWHS, AmbAgeing, LoadShape, Limits)
+            tx.perform_rating(AmbWHS, AmbAgeing, LoadShape, Limits)
 
             Results = jsondata['ExpectedResults']
             self.assertEqual(tx.MaxTOTemp, Results['MaxTOTemp'])

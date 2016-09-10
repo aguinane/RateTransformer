@@ -15,7 +15,7 @@ The following will return the peak load rating:
 ```
 from ratetransformer import Transformer
 tx = Transformer(HeatRunData, ThermalChar)
-tx.perform_rating(t, AmbWHS, AmbAgeing, LoadShape, Limits)
+tx.perform_rating(AmbWHS, AmbAgeing, LoadShape, Limits)
 print(tx.MaxLoad)
 ```
 

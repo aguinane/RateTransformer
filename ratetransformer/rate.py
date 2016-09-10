@@ -1,5 +1,6 @@
 import math
 
+
 class Transformer:
     """ A Power Transformer object
     """
@@ -8,15 +9,14 @@ class Transformer:
         self.RatedLoad = HeatRunData['RatedLoad']
         self.ThermalChar = ThermalChar
 
-
-    def perform_rating(self, t, AmbWHS, AmbAgeing, LoadShape, Limits):
+    def perform_rating(self, AmbWHS, AmbAgeing, LoadShape, Limits):
         """ Perform rating on a single transformer for specified rating limits
         """
 
         self.AmbWHS = AmbWHS
         self.AmbAgeing = AmbAgeing
         self.LoadShape = LoadShape # Load to be considered (in MVA)
-        self.t = t  # Time Interval(min)
+        self.t = 30.0  # Time Interval(min)
 
         self.MaxLoadLimit = Limits['MaxLoadPU']
         self.TopOilLimit = Limits['TopOil']
@@ -48,7 +48,7 @@ class Transformer:
         for i in range(maxIterations):
             while Limit == False:
                 (Limit, Max_Load, Max_TOtemp, Max_WHStemp,
-                    L) = self.CalculateLimit(ScaleFactor, t, self.HeatRunData, self.ThermalChar,
+                    L) = self.CalculateLimit(ScaleFactor, self.t, self.HeatRunData, self.ThermalChar,
                     Limits, AmbWHS, AmbAgeing, LoadShape)
                 NumIter += 1
                 ScaleFactor += IncrementFactor
@@ -59,7 +59,7 @@ class Transformer:
             if ScaleFactor < 0:
                 ScaleFactor = 0
             (Limit, Max_Load, Max_TOtemp, Max_WHStemp,
-                L) = self.CalculateLimit(ScaleFactor, t, self.HeatRunData, self.ThermalChar,
+                L) = self.CalculateLimit(ScaleFactor, self.t, self.HeatRunData, self.ThermalChar,
                     Limits, AmbWHS, AmbAgeing, LoadShape)
 
             # Decrese the amount scaled for next iteration run
@@ -80,7 +80,6 @@ class Transformer:
         self.CRF = round(self.MaxLoad / self.HeatRunData['RatedLoad'],4)
         self.NumIterations = NumIter
 
-
     def CalculateLimit(self, ScaleFactor, t, HeatRunData, ThermalChar,
                     Limits, AmbWHS, AmbAgeing, LoadShape):
         """ Scales load and checks whether limit will be breached
@@ -88,7 +87,8 @@ class Transformer:
         TempLoadShape = [i * ScaleFactor for i in LoadShape]
 
         # Initial Temperatures as Zero
-        TOinitial = 0; WHSinitial = 0
+        TOinitial = 0
+        WHSinitial = 0
 
         # Iterate until starting and ending top oil temp are the same
         for i in range(25): #Stop after 25 iterations if not converged
@@ -135,20 +135,15 @@ class Transformer:
             WHSinitial = WHSrise
 
         # Calculate the maximum and total values
-
         Max_Load = max(TempLoadShape)
         Max_TOtemp = max(List_TOtemp)
         Max_WHStemp = max(List_WHStemp)
 
-        L = 0
-        for V in List_V:
-            L += (V * t)  # Sum loss of life in minutes for each interval
-        L = L / 60        # Calculate loss of life in hours
+        LoL = calulate_loss_of_life(List_V, t)
 
-        Limit = self.was_limit_reached(Max_Load, Max_TOtemp, Max_WHStemp, L)
+        Limit = self.was_limit_reached(Max_Load, Max_TOtemp, Max_WHStemp, LoL)
 
-        return Limit, Max_Load, Max_TOtemp, Max_WHStemp, L
-
+        return Limit, Max_Load, Max_TOtemp, Max_WHStemp, LoL
 
     def was_limit_reached(self, Max_Load, Max_TOtemp, Max_WHStemp, LoL):
         """ Determine if any of the specified limits were reached
@@ -169,6 +164,17 @@ class Transformer:
             return True
         else:
             return False
+
+
+def calulate_loss_of_life(List_V, t):
+    """ For list of V values, calculate loss of life in hours
+    t = Time Interval (min)
+    """
+    L = 0
+    for V in List_V:
+        L += (V * t)  # Sum loss of life in minutes for each interval
+    LoL = L / 60  # Calculate loss of life in hours
+    return LoL
 
 
 def calc_winding_rise(t, StartTemp, Load, HeatRunData, 
@@ -234,8 +240,6 @@ def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
     # Determine instantaneous top oil temperature for given load
     dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, ThermalChar['k11'], Tau)
     return dTO
-
-
 
 
 def ult_top_oil_rise_at_load(K, R, dTOr, x):
