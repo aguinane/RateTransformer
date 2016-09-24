@@ -1,6 +1,4 @@
 import unittest
-import sys
-sys.path.append('.') # Test from parent folder
 from ratetransformer import rate
 from ratetransformer import Transformer
 import json
@@ -11,7 +9,7 @@ class TestRateTx(unittest.TestCase):
 
     def test_converged_values(self):
 
-        examples = ['example1.json']
+        examples = ['tests/example1.json']
         for example in examples:
             with open(example, newline='') as json_file:
                 jsondata = json.load(json_file)
