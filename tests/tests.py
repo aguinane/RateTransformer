@@ -1,4 +1,6 @@
 import unittest
+import sys
+sys.path.append('.') # Test from parent folder
 from ratetransformer import rate
 from ratetransformer import Transformer
 import json
