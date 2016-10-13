@@ -5,10 +5,8 @@ RateTransformer
 A tool for performing cyclic ratings of power transformers as per Australian Standard 60076.
 
 ### Installation
-Run:
 ```
-python setup.py build
-python setup.py install
+pip install ratetransformer
 ```
 
 ### Usage
