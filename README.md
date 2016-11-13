@@ -1,6 +1,6 @@
 RateTransformer
 ===============
-![build](https://travis-ci.org/aguinane/RateTransformer.svg?branch=develop)
+[![Build Status](https://travis-ci.org/aguinane/RateTransformer.svg?branch=develop)](https://travis-ci.org/aguinane/RateTransformer)
 
 A tool for performing cyclic ratings of power transformers as per Australian Standard 60076.
 
