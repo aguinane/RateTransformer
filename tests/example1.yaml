@@ -1,0 +1,36 @@
+Limits:
+    MaxLoadPU: 1.5  # Maximum nameplate loading [pu]
+    HotSpot: 120.0  # Maximum winding hot spot temperature [°C]
+    TopOil: 105.0   # Maximum top oil temperature [°C]
+    LoL: 24.0       # Ageing (loss-of-life) limit [hours per day]
+HeatRun:
+    CoolingMode: ONAN   # Cooling method in use
+    RatedLoad: 25.0     # Nameplate rating (MVA)
+    dTOr: 35.4          # Top-oil temperature rise in steady state at rated losses
+    gr: 14.8            # Average-winding-to-average-oil (in tank) temp gradient at rated current
+    H: 1.3              # Hot spot factor
+    P: 20220.0          # Supplied Losses
+    R: 23.305           # Ratio of load losses at rated current to no-load losses
+Thermal:
+    CoolingMode: ONAN
+    k11: 0.5        # Thermal model constant
+    k21: 2.0        # Thermal model constant
+    k22: 2.0        # Thermal model constant
+    y: 1.3          # Exponential power of current versus winding temperature rise (winding exponent)
+    TauO: 90.0      # Average oil time constant [min]
+    C: 10507.3      # Thermal Capacity [Ws/K]
+    TauW: 7.0       # Winding time constant [min]
+    x: 1.0          # Exponential power of total losses versus top-oil (in tank) temperature rise (oil-exponent)
+    n: 0.8          # Number of each time interval
+AmbAgeing: 27.85    # The yearly weighted ambient temperature [°C]
+AmbWHS: 24.72       # The monthly average temperature of the hottest month [°C]
+# Average Daily Load Profile
+LoadShape: [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0, 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+# Expected results for above parameters for comparison
+ExpectedResults:
+    MaxTOTemp: 71.61
+    MaxWHSTemp: 94.87
+    Ageing: 24.0
+    MaxLoad: 28.925
+    CRF: 1.157
+    RatingReason: Age
