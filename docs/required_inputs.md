@@ -37,9 +37,10 @@ Alternatively, tauO can be calculated if the following values are provided.
 
 
 The tauO calculation also requires the following IEEE constant:
-| Cooling Mode      |  | ONAN, ON  | ONAF, OB, OFAN, OF, OFB  | ODAN,  ODAF |
-|---                |---    |---   |---     |---   |
-|Oil Constant | n     | 0.8  | 0.9   | 1.0   |
+
+| Cooling Mode      | ONAN, ON  | ONAF, OB, OFAN, OF, OFB  | ODAN,  ODAF |
+|---                |---   |---    |---    |
+|Oil Constant (n)   | 0.8  | 0.9   | 1.0   |
 
 
 ## Seasonal Characteristics
