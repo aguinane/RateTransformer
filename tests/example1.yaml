@@ -21,7 +21,6 @@ Thermal:
     C: 10507.3      # Thermal Capacity [Ws/K]
     TauW: 7.0       # Winding time constant [min]
     x: 1.0          # Exponential power of total losses versus top-oil (in tank) temperature rise (oil-exponent)
-    n: 0.8          # Number of each time interval
 AmbAgeing: 27.85    # The yearly weighted ambient temperature [°C]
 AmbWHS: 24.72       # The monthly average temperature of the hottest month [°C]
 # Average Daily Load Profile
