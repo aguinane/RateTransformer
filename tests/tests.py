@@ -9,32 +9,56 @@ class TestRateTx(unittest.TestCase):
     """
 
     def test_converged_values(self):
-        """ Test the calculated rating for an example
+        """ Test the calculated rating for example1.yaml
         """
-        examples = ['tests/example1.yaml']
-        for example in examples:
-            with open(example, newline='') as example_file:
-                data = yaml.load(example_file)
+        with open('tests/example1.yaml', newline='') as example_file:
+            data = yaml.load(example_file)
 
-            HeatRunData = data['HeatRun']
-            ThermalChar = data['Thermal']
+        HeatRunData = data['HeatRun']
+        ThermalChar = data['Thermal']
 
-            tx = Transformer(HeatRunData, ThermalChar)
+        tx = Transformer(HeatRunData, ThermalChar)
 
-            AmbWHS = data['AmbWHS']
-            AmbAgeing = data['AmbAgeing']
-            LoadShape = data['LoadShape']
-            Limits = data['Limits']
+        AmbWHS = data['AmbWHS']
+        AmbAgeing = data['AmbAgeing']
+        LoadShape = data['LoadShape']
+        Limits = data['Limits']
 
-            tx.perform_rating(AmbWHS, AmbAgeing, LoadShape, Limits)
+        tx.perform_rating(AmbWHS, AmbAgeing, LoadShape, Limits)
 
-            Results = data['ExpectedResults']
-            self.assertEqual(tx.MaxTOTemp, Results['MaxTOTemp'])
-            self.assertEqual(tx.MaxWHSTemp, Results['MaxWHSTemp'])
-            self.assertEqual(tx.Ageing, Results['Ageing'])
-            self.assertEqual(tx.MaxLoad, Results['MaxLoad'])
-            self.assertEqual(tx.CRF, Results['CRF'])
-            self.assertEqual(tx.RatingReason, Results['RatingReason'])
+        Results = data['ExpectedResults']
+        self.assertEqual(tx.MaxTOTemp, Results['MaxTOTemp'])
+        self.assertEqual(tx.MaxWHSTemp, Results['MaxWHSTemp'])
+        self.assertEqual(tx.Ageing, Results['Ageing'])
+        self.assertEqual(tx.MaxLoad, Results['MaxLoad'])
+        self.assertEqual(tx.CRF, Results['CRF'])
+        self.assertEqual(tx.RatingReason, Results['RatingReason'])
+
+    def test_defaults(self):
+        """ Test the calculated rating for example2.yaml
+        """
+        with open('tests/example2.yaml', newline='') as example_file:
+            data = yaml.load(example_file)
+
+        HeatRunData = data['HeatRun']
+        ThermalChar = {}
+
+        tx = Transformer(HeatRunData, ThermalChar)
+
+        AmbWHS = data['AmbWHS']
+        AmbAgeing = data['AmbAgeing']
+        LoadShape = data['LoadShape']
+        Limits = {}
+
+        tx.perform_rating(AmbWHS, AmbAgeing, LoadShape, Limits)
+
+        Results = data['ExpectedResults']
+        self.assertEqual(tx.MaxTOTemp, Results['MaxTOTemp'])
+        self.assertEqual(tx.MaxWHSTemp, Results['MaxWHSTemp'])
+        self.assertEqual(tx.Ageing, Results['Ageing'])
+        self.assertEqual(tx.MaxLoad, Results['MaxLoad'])
+        self.assertEqual(tx.CRF, Results['CRF'])
+        self.assertEqual(tx.RatingReason, Results['RatingReason'])
 
 
 class TestRatingFunctions(unittest.TestCase):

@@ -23,13 +23,37 @@ class Transformer:
         except KeyError:
             self.H = 1.3
 
-        self.C = ThermalChar['C']  # Thermal Capacity
-        self.x = ThermalChar['x']  # Oil Exponent
-        self.y = ThermalChar['y']  # Winding Exponent
-        self.k11 = ThermalChar['k11']
-        self.k21 = ThermalChar['k21']
-        self.k22 = ThermalChar['k22']
-        self.TauW = ThermalChar['TauW']  # Winding Time Constant
+        try:
+            self.x = ThermalChar['x']  # Oil Exponent
+        except KeyError:
+            self.x = recommended_oil_exponent(self.CoolingMode)
+        try:
+            self.y = ThermalChar['y']  # Winding Exponent
+        except KeyError:
+            self.y = recommended_winding_exponent(self.CoolingMode)
+
+        try:
+            self.C = ThermalChar['C']  # Thermal Capacity
+        except KeyError:
+            try:
+                mass_assembly = ThermalChar['mass_assembly']
+                mass_tank = ThermalChar['mass_tank']
+                vol_oil = ThermalChar['vol_oil']
+                self.C = thermal_capacity(vol_oil, mass_assembly, mass_tank, self.CoolingMode)
+            except KeyError:
+                self.C = None
+
+        try:
+            self.k11 = ThermalChar['k11']
+            self.k21 = ThermalChar['k21']
+            self.k22 = ThermalChar['k22']
+        except KeyError:
+            self.k11, self.k21, self.k22 = recommended_thermal_constants(self.CoolingMode)
+
+        try:
+            self.TauW = ThermalChar['TauW']  # Winding Time Constant
+        except:
+            self.TauW = recommended_winding_time_constant(self.CoolingMode)
 
         self.n = recommended_oil_time_constant(self.CoolingMode)
 
@@ -311,7 +335,7 @@ def inst_top_oil_rise_at_load(dTOi, dTOult, t, k11, Tau):
 def determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr):
     """ Determine the oil thermal time constant - rated load
     """
-    if C == 0:
+    if C is None or C == 0:
         # Use Lookup Table - AS 60077.7-2013 Table 5
         if any(CoolingMode in s for s in ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']):
             TauR = 90.0

@@ -1,0 +1,19 @@
+HeatRun:
+    CoolingMode: ONAN   # Cooling method in use
+    RatedLoad: 25.0     # Nameplate rating (MVA)
+    dTOr: 35.4          # Top-oil temperature rise in steady state at rated losses
+    gr: 14.8            # Average-winding-to-average-oil (in tank) temp gradient at rated current
+    P: 20220.0          # Supplied Losses
+    R: 23.305           # Ratio of load losses at rated current to no-load losses
+AmbAgeing: 27.85    # The yearly weighted ambient temperature [°C]
+AmbWHS: 24.72       # The monthly average temperature of the hottest month [°C]
+# Average Daily Load Profile
+LoadShape: [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0, 1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+# Expected results for above parameters for comparison
+ExpectedResults:
+    MaxTOTemp: 70.83
+    MaxWHSTemp: 94.87
+    Ageing: 24.0
+    MaxLoad: 29.669
+    CRF: 1.1868
+    RatingReason: Age
