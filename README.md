@@ -22,17 +22,4 @@ print(tx.MaxLoad)
 
 An example of how these variables should be set can be seen in the example data provided in the tests folder.
 
-### Cyclic Rating Process Overview
-Start the model with initial oil temperature of zero.
-
-![Screenshot](/docs/curve_0.png?raw=true "Transformer Model")
-
-Iterate until oil temperature stabilises for given daily load shape.
-
-![Screenshot](/docs/curve_1.png?raw=true "Transformer Model")
-
-Increment load magnitude until one of the passed limits are breached.
-(In this case the winding hotspot temperature has reached 120 degrees)
-
-![Screenshot](/docs/curve_2.png?raw=true "Transformer Model")
-
+More information is also provided in the docs folder.
