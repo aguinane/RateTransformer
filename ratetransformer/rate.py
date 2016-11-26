@@ -1,27 +1,156 @@
+import logging
 import math
 
 
 class Transformer:
     """ A Power Transformer object
     """
+
     def __init__(self, HeatRunData, ThermalChar):
+        """ Set up the transformer characteristics
+        """
         self.HeatRunData = HeatRunData
-        self.RatedLoad = HeatRunData['RatedLoad']
         self.ThermalChar = ThermalChar
 
-    def perform_rating(self, AmbWHS, AmbAgeing, LoadShape, Limits):
-        """ Perform rating on a single transformer for specified rating limits
+        self.RatedLoad = HeatRunData['RatedLoad']
+        self.CoolingMode = HeatRunData['CoolingMode']
+        self.P = HeatRunData['P']  # Supplied Losses
+        self.dTOr = HeatRunData['dTOr']  # Top oil temp
+        self.gr = HeatRunData['gr']  # Winding gradient
+        self.R = HeatRunData['R']  # Loss ratio
+        try:
+            self.H = HeatRunData['H']  # Hot spot factor
+        except KeyError:
+            self.H = 1.3
+
+        try:
+            self.x = ThermalChar['x']  # Oil Exponent
+        except KeyError:
+            self.x = recommended_oil_exponent(self.CoolingMode)
+        try:
+            self.y = ThermalChar['y']  # Winding Exponent
+        except KeyError:
+            self.y = recommended_winding_exponent(self.CoolingMode)
+
+        try:
+            self.C = ThermalChar['C']  # Thermal Capacity
+        except KeyError:
+            try:
+                mass_assembly = ThermalChar['mass_assembly']
+                mass_tank = ThermalChar['mass_tank']
+                vol_oil = ThermalChar['vol_oil']
+                self.C = thermal_capacity(vol_oil, mass_assembly, mass_tank, self.CoolingMode)
+            except KeyError:
+                self.C = None
+
+        try:
+            self.k11 = ThermalChar['k11']
+            self.k21 = ThermalChar['k21']
+            self.k22 = ThermalChar['k22']
+        except KeyError:
+            self.k11, self.k21, self.k22 = recommended_thermal_constants(self.CoolingMode)
+
+        try:
+            self.TauW = ThermalChar['TauW']  # Winding Time Constant
+        except:
+            self.TauW = recommended_winding_time_constant(self.CoolingMode)
+
+        self.n = recommended_oil_time_constant(self.CoolingMode)
+
+    def calc_winding_rise(self, t, StartTemp, Load, LoadIncreasing):
+        """ Calculate the winding rise
+        Input values:
+        t = Time Interval (min)
+        StartTemp = Initial Top Oil Rise
+        Load = Load to be considered (in MVA)
+        HeatRunData is a dict with test results
+        ThermalChar is a dict with thermal characteristics for cooling mode
         """
 
+        ThermalChar = self.ThermalChar
+        TauR = determine_oil_thermal_time_constant(self.CoolingMode, self.C, self.P, self.dTOr)
+
+        # Calculate ultimate winding rise to simplify below formulas
+        K = float(Load / self.RatedLoad)
+        dWHS = self.H * self.gr * (K ** self.y)
+
+        if LoadIncreasing == True:
+            # As per AS60076.7 Eq. (5)
+            f2 = (self.k21 *
+                (1 - math.exp((-t) / (self.k22 * self.TauW))) -
+                (self.k21 - 1) *
+                (1 - math.exp((-t) / (TauR / self.k22)))
+                )
+            dWHSt = StartTemp + (dWHS - StartTemp) * f2
+        else:
+            # As per AS60076.7 Eq. (6)
+            dWHSt = dWHS + (StartTemp - dWHS) * \
+                math.exp((-t) / (self.TauW))
+
+        return dWHSt
+
+
+    def calc_top_oil_rise(self, t, StartTemp, Load):
+        """ Calculate top oil rise
+        Input values:
+        t = Time Interval (min)
+        StartTemp = Initial Top Oil Rise
+        Load = Load to be considered (in MVA)
+        HeatRunData is a dict with test results
+        ThermalChar is a dict with thermal characteristics for cooling type
+        """
+        ThermalChar = self.ThermalChar
+        dTOi = StartTemp
+        K = Load / self.RatedLoad
+        # Determine ultimate (steady state) temperature for given load
+        dTOult = ult_top_oil_rise_at_load(K, self.R,
+                                        self.dTOr, self.x)
+
+        TauR = determine_oil_thermal_time_constant(self.CoolingMode, self.C, self.P, self.dTOr)
+
+        # Determine the oil thermal time constant - specified load
+        Tau = thermal_time_constant_as_considered_load(TauR, self.dTOr,
+                                                    dTOi, dTOult, self.n)
+        # Determine instantaneous top oil temperature for given load
+        dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, self.k11, Tau)
+        return dTO
+
+
+    def perform_rating(self, AmbWHS=25.0, AmbAgeing=27.0, LoadShape=[], Limits={}):
+        """ Perform rating on a single transformer for specified rating limits
+
+            AmbWHS      The monthly average temperature of the hottest month [°C]
+            AmbAgeing   The yearly weighted ambient temperature [°C]
+            LoadShape   The cyclic load curve to be considered (in MVA)
+            Limits      Current and temperature limits
+        """
         self.AmbWHS = AmbWHS
         self.AmbAgeing = AmbAgeing
-        self.LoadShape = LoadShape # Load to be considered (in MVA)
-        self.t = 30.0  # Time Interval(min)
 
-        self.MaxLoadLimit = Limits['MaxLoadPU']
-        self.TopOilLimit = Limits['TopOil']
-        self.WHSLimit = Limits['HotSpot']
-        self.LoLLimit = Limits['LoL']
+        self.LoadShape = LoadShape
+        self.t = 30.0  # Time Interval (min)
+
+        if self.LoadShape == []:
+            self.LoadShape = [1.0] * 48
+
+        # Get limits to determine rating for (if provided)
+        # Set default limits as per AS60076.7 Table 4
+        try:
+            self.MaxLoadLimit = Limits['MaxLoadPU']
+        except KeyError:
+            self.MaxLoadLimit = 1.5
+        try:
+            self.TopOilLimit = Limits['TopOil']
+        except KeyError:
+            self.TopOilLimit = 105
+        try:
+            self.WHSLimit = Limits['HotSpot']
+        except KeyError:
+            self.WHSLimit = 120
+        try:
+            self.LoLLimit = Limits['LoL']
+        except KeyError:
+            self.LoLLimit = 24
 
         # Define some initial values
         NumIter = 0
@@ -29,19 +158,22 @@ class Transformer:
         PrevPeak = 0.0001
 
         # Calculate the starting scaling
-        RatedLoad = self.HeatRunData['RatedLoad']
-        MaxLoad = max(self.LoadShape)
+        if self.LoadShape:
+            MaxLoad = max(self.LoadShape)
+        else:
+            MaxLoad = self.RatedLoad
+
         # Start by incrementing by double max load
-        IncrementFactor = (float(RatedLoad) / float(MaxLoad))
-        ScaleFactor = IncrementFactor * 0.5 #Start with half initial load
+        IncrementFactor = (float(self.RatedLoad) / float(MaxLoad))
+        ScaleFactor = IncrementFactor * 0.5  # Start with half initial load
 
         if IncrementFactor < 0.5:
-            IncrementFactor = 0.5 # Start at half way
+            IncrementFactor = 0.5  # Start at half way
 
         if ScaleFactor < 0.2:
-            ScaleFactor = 0.2 # Start reasonably high
+            ScaleFactor = 0.2  # Start reasonably high
 
-        self.RatingReason = 'Did not converge' # Stops errors later
+        self.RatingReason = 'Did not converge'  # Stops errors later
 
         # Loop until scaling factor is sufficiently small
         maxIterations = 150
@@ -49,7 +181,7 @@ class Transformer:
             while Limit == False:
                 (Limit, Max_Load, Max_TOtemp, Max_WHStemp,
                     L) = self.CalculateLimit(ScaleFactor, self.t, self.HeatRunData, self.ThermalChar,
-                    Limits, AmbWHS, AmbAgeing, LoadShape)
+                                             Limits, self.AmbWHS, self.AmbAgeing, self.LoadShape)
                 NumIter += 1
                 ScaleFactor += IncrementFactor
 
@@ -60,7 +192,7 @@ class Transformer:
                 ScaleFactor = 0
             (Limit, Max_Load, Max_TOtemp, Max_WHStemp,
                 L) = self.CalculateLimit(ScaleFactor, self.t, self.HeatRunData, self.ThermalChar,
-                    Limits, AmbWHS, AmbAgeing, LoadShape)
+                                         Limits, self.AmbWHS, self.AmbAgeing, self.LoadShape)
 
             # Decrese the amount scaled for next iteration run
             IncrementFactor = (IncrementFactor / 2)
@@ -72,16 +204,16 @@ class Transformer:
             self.Ageing = round(L, 3)
 
             # Check if converged early
-            if IncrementFactor < 0.00001: # Check scaling factor is small
+            if IncrementFactor < 0.00001:  # Check scaling factor is small
                 if PrevPeak == Max_Load:
                     break
             PrevPeak = Max_Load
 
-        self.CRF = round(self.MaxLoad / self.HeatRunData['RatedLoad'],4)
+        self.CRF = round(self.MaxLoad / self.RatedLoad, 4)
         self.NumIterations = NumIter
 
     def CalculateLimit(self, ScaleFactor, t, HeatRunData, ThermalChar,
-                    Limits, AmbWHS, AmbAgeing, LoadShape):
+                       Limits, AmbWHS, AmbAgeing, LoadShape):
         """ Scales load and checks whether limit will be breached
         """
         TempLoadShape = [i * ScaleFactor for i in LoadShape]
@@ -91,13 +223,16 @@ class Transformer:
         WHSinitial = 0
 
         # Iterate until starting and ending top oil temp are the same
-        for i in range(25): #Stop after 25 iterations if not converged
+        for i in range(25):  # Stop after 25 iterations if not converged
 
             # Set up containers for final results
-            List_TOtemp = []; List_WHStemp = []; List_V = []
+            List_TOtemp = []
+            List_WHStemp = []
+            List_V = []
 
             # Set starting temperatures to final in previous run
-            TOprev = TOinitial; WHSprev = WHSinitial
+            TOprev = TOinitial
+            WHSprev = WHSinitial
 
             # Loop through loads values
             for index, Load in enumerate(TempLoadShape):
@@ -108,12 +243,10 @@ class Transformer:
                 else:
                     LoadIncreasing = False
 
-                TOrise = calc_top_oil_rise(t, TOprev, Load,
-                    HeatRunData, ThermalChar)
+                TOrise = self.calc_top_oil_rise(t, TOprev, Load)
                 TOtemp = AmbWHS + TOrise
 
-                WHSrise = calc_winding_rise(t, WHSprev, Load, HeatRunData,
-                    ThermalChar,LoadIncreasing)
+                WHSrise = self.calc_winding_rise(t, WHSprev, Load, LoadIncreasing)
                 WHStemp = AmbWHS + TOrise + WHSrise
                 WHSageing = AmbAgeing + TOrise + WHSrise
                 V = relative_ageing_rate(WHSageing)
@@ -128,7 +261,7 @@ class Transformer:
 
             # Check if converged early
             if TOinitial == TOrise:
-                break # Exit loop
+                break  # Exit loop
 
             # Set ending temperatures to initial
             TOinitial = TOrise
@@ -177,71 +310,6 @@ def calulate_loss_of_life(List_V, t):
     return LoL
 
 
-def calc_winding_rise(t, StartTemp, Load, HeatRunData, 
-                      ThermalChar, LoadIncreasing):
-    """ Calculate the winding rise
-    Input values:
-    t = Time Interval (min)
-    StartTemp = Initial Top Oil Rise
-    Load = Load to be considered (in MVA)
-    HeatRunData is a dict with test results
-    ThermalChar is a dict with thermal characteristics for cooling mode
-    """ 
-
-    CoolingMode = ThermalChar['CoolingMode']
-    C = ThermalChar['C']
-    P = HeatRunData['P']
-    dTOr = HeatRunData['dTOr']
-    TauR = determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr)
-
-    # Calculate ultimate winding rise to simplify below formulas
-    K = float(Load / HeatRunData['RatedLoad'])
-    dWHS = HeatRunData['H'] * HeatRunData['gr'] * (K ** ThermalChar['y'])
-
-    if LoadIncreasing == True:
-        # As per AS60076.7 Eq. (5)
-        f2 = (ThermalChar['k21'] * 
-            (1- math.exp((-t)/(ThermalChar['k22']*ThermalChar['TauW']))) - 
-            (ThermalChar['k21'] -1) * 
-            (1- math.exp((-t)/(TauR/ThermalChar['k22'])))
-            )
-        dWHSt = StartTemp + (dWHS - StartTemp) * f2
-    else:
-        # As per AS60076.7 Eq. (6)
-        dWHSt = dWHS + (StartTemp-dWHS) * math.exp((-t)/(ThermalChar['TauW']))
-
-    return dWHSt
-
-
-def calc_top_oil_rise(t, StartTemp, Load, HeatRunData, ThermalChar):
-    """ Calculate top oil rise
-    Input values:
-    t = Time Interval (min)
-    StartTemp = Initial Top Oil Rise
-    Load = Load to be considered (in MVA)
-    HeatRunData is a dict with test results
-    ThermalChar is a dict with thermal characteristics for cooling type
-    """
-    dTOi = StartTemp
-    K = Load / HeatRunData['RatedLoad']
-    # Determine ultimate (steady state) temperature for given load
-    dTOult = ult_top_oil_rise_at_load(K, HeatRunData['R'], 
-        HeatRunData['dTOr'], ThermalChar['x'])
-
-    CoolingMode = ThermalChar['CoolingMode']
-    C = ThermalChar['C']
-    P = HeatRunData['P']
-    dTOr = HeatRunData['dTOr']
-    TauR = determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr)
-
-    # Determine the oil thermal time constant - specified load
-    Tau = thermal_time_constant_as_considered_load(TauR,HeatRunData['dTOr'],
-        dTOi, dTOult, ThermalChar['n'] )
-    # Determine instantaneous top oil temperature for given load
-    dTO = inst_top_oil_rise_at_load(dTOi, dTOult, t, ThermalChar['k11'], Tau)
-    return dTO
-
-
 def ult_top_oil_rise_at_load(K, R, dTOr, x):
     """ Calculate the steady-state top oil rise for a given load
     K = Ratio of ultimate load to rated load
@@ -250,7 +318,7 @@ def ult_top_oil_rise_at_load(K, R, dTOr, x):
     x = oil exponent based on cooling method
     TOrated = Top-oil temperature at rated load (as determined by heat run)
     """
-    dTO = dTOr * ((((K**2)*R) + 1) / (R+1)) ** x
+    dTO = dTOr * ((((K**2) * R) + 1) / (R + 1)) ** x
 
     return dTO
 
@@ -259,7 +327,7 @@ def inst_top_oil_rise_at_load(dTOi, dTOult, t, k11, Tau):
     """ Calculate the instanous top oil rise at a given time period
     """
     # As per AS60076.7 Eq. (2)
-    dTO = dTOult + (dTOi - dTOult) * math.exp((-t)/(k11*Tau))
+    dTO = dTOult + (dTOi - dTOult) * math.exp((-t) / (k11 * Tau))
 
     return dTO
 
@@ -267,7 +335,7 @@ def inst_top_oil_rise_at_load(dTOi, dTOult, t, k11, Tau):
 def determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr):
     """ Determine the oil thermal time constant - rated load
     """
-    if C == 0:
+    if C is None or C == 0:
         # Use Lookup Table - AS 60077.7-2013 Table 5
         if any(CoolingMode in s for s in ['ODAF', 'ODAN', 'OFAN', 'OF', 'OFB']):
             TauR = 90.0
@@ -275,7 +343,7 @@ def determine_oil_thermal_time_constant(CoolingMode, C, P, dTOr):
             if any(CoolingMode in s for s in ['ONAF', 'OB']):
                 TauR = 150.0
             else:
-               TauR = 210.0
+                TauR = 210.0
     else:
         # Calculate the Tau value
         TauR = thermal_time_constant_at_rated_load(C, P, dTOr)
@@ -291,7 +359,6 @@ def thermal_time_constant_at_rated_load(C, P, dTOr):
     in K at the load considered
     """
     tau = (C * dTOr * 60) / P
-
     return tau
 
 
@@ -306,12 +373,12 @@ def thermal_time_constant_as_considered_load(TauR, dTOr, dTOi, dTOu, n):
     """
     a = dTOu / dTOr
     b = dTOi / dTOr
-    if (a-b) == 0 or n == 0:
+    if (a - b) == 0 or n == 0:
         # Will avoid divide by zero error
         STTTC = TauR
     else:
         try:
-            STTTC = TauR * (a-b)/((a**(1/n))-(b**(1/n)))
+            STTTC = TauR * (a - b) / ((a**(1 / n)) - (b**(1 / n)))
         except ZeroDivisionError:
             STTTC = TauR    # The a-b didn't catch the error
     return STTTC
@@ -323,7 +390,93 @@ def relative_ageing_rate(WHST):
     Applies to non-thermally upgraded paper only
     """
     try:
-        V = 2 ** ((WHST-98.0)/6)
+        V = 2 ** ((WHST - 98.0) / 6)
     except OverflowError:
         V = 10000000.0  # High WHST numbers cause errors
     return V
+
+
+def thermal_capacity(oil_volume, mass_core, mass_tank, cooling_mode):
+    """ Calculate the thermal capacity of transformer oil
+        As per AS60076.7 Eq. (A.4 and A.5)
+    """
+    if oil_volume == 0 or mass_core == 0 or mass_tank == 0:
+        C = 0  # Data not available
+    else:
+        mass_oil = 0.87825 * oil_volume  # Mass of oil in kilograms
+        Cooling_List = ['ONAN', 'ON', 'ONAF', 'OB']
+        if any(cooling_mode in s for s in Cooling_List):
+            C = 0.132 * mass_core + 0.0882 * mass_tank + 0.400 * mass_oil
+        else:
+            C = 0.132 * (mass_core + mass_tank) + 0.580 * mass_oil
+    return C
+
+
+def recommended_thermal_constants(cooling_mode):
+    """ Get recommended oil exponent as per AS 60076.7-2013 Table 5
+    """
+    # Constants - As per AS 60076.7-2013 Table 5
+    Cooling_List = ['ONAN', 'ONAF', 'ON', 'OB']
+    if any(cooling_mode in s for s in Cooling_List):
+        k11 = 0.5
+        k21 = 2.0
+        k22 = 2.0
+    else:
+        Cooling_List = ['OFAN', 'OF', 'OFB']
+        if any(cooling_mode in s for s in Cooling_List):
+            k11 = 1.0
+            k21 = 1.3
+            k22 = 1.0
+        else:
+            k11 = 1.0
+            k21 = 1.0
+            k22 = 1.0
+    return k11, k21, k22
+
+
+def recommended_winding_time_constant(cooling_mode):
+    """ Get recommended time constant TauW as per AS 60076.7-2013 Table 5
+    """
+    Cooling_List = ['ONAN', 'ON']
+    if any(cooling_mode in s for s in Cooling_List):
+        TauW = 10.0
+    else:
+        TauW = 7.0
+    return TauW
+
+
+def recommended_oil_time_constant(cooling_mode):
+    """ Get recommended oil tau constant as per IEEE C57.91-2011 Table 4
+    """
+    Cooling_List = ['ONAN', 'ON']
+    if any(cooling_mode in s for s in Cooling_List):
+        n = 0.8
+    else:
+        Cooling_List = ['ONAF', 'OB', 'OFAN', 'OF', 'OFB']
+        if any(cooling_mode in s for s in Cooling_List):
+            n = 0.9
+        else:
+            n = 1.0
+    return n
+
+
+def recommended_oil_exponent(cooling_mode):
+    """ Get recommended oil exponent as per AS 60076.7-2013 Table 5
+    """
+    Cooling_List = ['ONAN', 'ON', 'ONAF', 'OB']
+    if any(cooling_mode in s for s in Cooling_List):
+        x = 0.8
+    else:
+        x = 1.0
+    return x
+
+
+def recommended_winding_exponent(cooling_mode):
+    """ Get recommended oil exponent as per AS 60076.7-2013 Table 5
+    """
+    Cooling_List = ['ONAN', 'ONAF', 'ON', 'OB', 'OFAN', 'OF', 'OFB']
+    if any(cooling_mode in s for s in Cooling_List):
+        y = 1.3
+    else:
+        y = 2.0
+    return y
